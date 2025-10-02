@@ -1,0 +1,50 @@
+version: '3.8'
+
+services:
+  # Main Express backend
+  backend:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - SIMLI_API_KEY=${SIMLI_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ELEVENLABS_API_KEY=${ELEVENLABS_API_KEY}
+      - RAG_BACKEND_URL=http://rag-backend:8000
+    depends_on:
+      - rag-backend
+
+  # Python RAG backend for Art Grants Expert
+  rag-backend:
+    build: 
+      context: ./rag-backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./rag-backend/data:/app/data
+      - chroma_db:/app/chroma_db
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - CHROMA_PERSIST_DIRECTORY=/app/chroma_db
+      - KNOWLEDGE_BASE_PATH=/app/data/art_grants_residencies_kb.json
+      - UPDATE_SCHEDULE=cron:0 0 * * *
+      - UPDATE_ON_STARTUP=false
+      - CORS_ORIGINS=http://localhost:3000,http://localhost:3001
+
+  # Frontend (if running in production)
+  frontend:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - VITE_API_URL=http://localhost:3001
+    depends_on:
+      - backend
+
+volumes:
+  chroma_db:

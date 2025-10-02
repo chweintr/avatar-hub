@@ -207,24 +207,30 @@ async def websocket_endpoint(websocket: WebSocket):
             data = await websocket.receive_json()
             
             if data.get("type") == "query":
-                # Process the query
-                query_text = data.get("text", "")
-                logger.info(f"Received query: {query_text}")
+                # Process the query from Simli frontend
+                query_text = data.get("text", "") or data.get("content", "")
+                logger.info(f"Received query from Simli: {query_text}")
                 
                 # Send processing status
                 await websocket.send_json({
-                    "type": "status",
-                    "message": "Processing your query..."
+                    "type": "processing",
+                    "message": "Searching knowledge base..."
                 })
                 
                 # Get response through RAG pipeline
                 response = await simli_orchestrator.process_query(
                     query_text,
-                    stream=True,
-                    websocket=websocket
+                    stream=False  # Don't stream for now
                 )
                 
-                # Send final response
+                # Send context chunks (optional, for debugging)
+                if response.sources:
+                    await websocket.send_json({
+                        "type": "context",
+                        "chunks": [{"source": s, "text": s[:100] + "..."} for s in response.sources[:3]]
+                    })
+                
+                # Send final response for Simli to speak
                 await websocket.send_json({
                     "type": "response",
                     "text": response.answer,

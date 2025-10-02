@@ -25,7 +25,7 @@ export const AVATARS: DockAvatar[] = [
     id: "grants",       
     name: "Grant / Residency Expert",  
     thumbnail: "/thumbs/grants.jpg",       
-    simliUrl: "/simli/grants",
+    simliUrl: `${window.location.origin}/simli-rag-agent.html?id=grants&faceId=cace3ef7-a4c4-425d-a8cf-a5358eb0c427&useRag=true`,
     description: "Application strategy and eligibility assessment"
   },
   { 

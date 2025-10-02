@@ -11,9 +11,10 @@ class Settings(BaseSettings):
     # API Keys
     OPENAI_API_KEY: str = Field(..., description="OpenAI API key for GPT-4o and embeddings")
     SIMLI_API_KEY: Optional[str] = Field(None, description="Simli API key")
-    SIMLI_FACE_ID: Optional[str] = Field(None, description="Simli Face ID for avatar")
+    SIMLI_FACE_ID: Optional[str] = Field("cace3ef7-a4c4-425d-a8cf-a5358eb0c427", description="Simli Face ID for avatar")
     SIMLI_AGENT_ID: Optional[str] = Field(None, description="Simli Agent ID for knowledge base")
     ELEVENLABS_API_KEY: Optional[str] = Field(None, description="ElevenLabs API key for TTS")
+    ELEVENLABS_VOICE_ID: Optional[str] = Field("OYTbf65OHHFELVut7v2H", description="ElevenLabs Voice ID")
     
     # Vector Database Configuration
     VECTOR_DB_TYPE: str = Field("chroma", description="Vector database type: chroma, pinecone, or weaviate")
