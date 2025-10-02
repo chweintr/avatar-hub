@@ -9,7 +9,8 @@ export interface Avatar {
   systemPrompt?: string;
   provider: AvatarProvider;
   providerConfig: {
-    faceId?: string;  // Simli face ID
+    faceId?: string;  // Simli face ID (visual appearance)
+    agentId?: string; // Simli agent ID (knowledge base/personality)
     avatarId?: string; // HeyGen avatar ID
     customConfig?: any; // For future providers
   };
@@ -28,6 +29,7 @@ export interface VideoLayerConfig {
 export interface SimliConfig {
   apiKey: string;
   faceId: string;
+  agentId?: string; // Optional agent ID for knowledge base
 }
 
 export interface HeyGenConfig {

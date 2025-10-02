@@ -39,16 +39,22 @@ app.post('/api/avatar/config', async (req, res) => {
           return res.status(500).json({ error: 'Simli not configured' });
         }
         
-        // Map avatar IDs to specific face IDs
+        // Map avatar IDs to specific face IDs and agent IDs
         const simliFaceIds: { [key: string]: string } = {
           'tax-specialist': 'afdb6a3e-3939-40aa-92df-01604c23101c',
+          // Add more mappings as needed
+        };
+        
+        const simliAgentIds: { [key: string]: string } = {
+          'tax-specialist': 'd951e6dc-c098-43fb-a34f-e970cd339ea6',
           // Add more mappings as needed
         };
 
         config = {
           provider: 'simli',
           apiKey: process.env.SIMLI_API_KEY,
-          faceId: simliFaceIds[avatarId] || process.env.SIMLI_FACE_ID
+          faceId: simliFaceIds[avatarId] || process.env.SIMLI_FACE_ID,
+          agentId: simliAgentIds[avatarId] || undefined
         };
         break;
 

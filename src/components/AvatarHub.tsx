@@ -15,7 +15,8 @@ const MOCK_AVATARS: Avatar[] = [
     agentType: 'tax-specialist',
     provider: 'simli',
     providerConfig: {
-      faceId: 'afdb6a3e-3939-40aa-92df-01604c23101c' // Your provided Simli face ID
+      faceId: 'afdb6a3e-3939-40aa-92df-01604c23101c', // Your provided Simli face ID
+      agentId: 'd951e6dc-c098-43fb-a34f-e970cd339ea6' // Your tax advisor agent ID (knowledge base)
     },
     systemPrompt: `You are a specialized tax advisor for artists and creative professionals. 
     Help with tax deductions, self-employment taxes, quarterly payments, and record keeping.
