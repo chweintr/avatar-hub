@@ -78,7 +78,7 @@ export default function StageCircle({ mode, simliUrl, heygenUrl, posterSrc, onDi
         </motion.div>
       </motion.div>
 
-      {onDismiss && (mode === "simli" || mode === "heygen") && (
+      {onDismiss && mode !== "empty" && (
         <div className="mt-6">
           <button onClick={onDismiss} className="rounded-full bg-black text-white px-5 py-2.5 text-sm hover:opacity-90" data-testid="dismiss">
             Dismiss
