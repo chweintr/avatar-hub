@@ -12,7 +12,8 @@
     "dev:server": "tsx watch server/index.ts",
     "build": "vite build",
     "build:server": "echo 'Server built'",
-    "start": "tsx server/index.ts",
+    "start": "NODE_ENV=production tsx server/index.ts",
+    "server": "tsx server/index.ts",
     "lint": "eslint .",
     "preview": "vite preview"
   },

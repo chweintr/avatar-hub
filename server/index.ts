@@ -16,6 +16,20 @@ const PORT = process.env.PORT || 3001;
 app.use(cors());
 app.use(express.json());
 
+// Serve static files in production
+if (process.env.NODE_ENV === 'production') {
+  // Serve the built frontend files
+  const distPath = join(__dirname, '..', 'dist');
+  
+  // Check if dist directory exists
+  if (fs.existsSync(distPath)) {
+    console.log(`Serving static files from: ${distPath}`);
+    app.use(express.static(distPath));
+  } else {
+    console.error(`Warning: dist directory not found at ${distPath}`);
+  }
+}
+
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
@@ -252,6 +266,20 @@ app.get('/api/rag/ws', (req, res) => {
   });
 });
 
+// Catch-all route for SPA - must be after all other routes
+if (process.env.NODE_ENV === 'production') {
+  app.get('*', (req, res) => {
+    const distPath = join(__dirname, '..', 'dist');
+    res.sendFile(join(distPath, 'index.html'), (err) => {
+      if (err) {
+        console.error('Error serving index.html:', err);
+        res.status(404).send('Frontend build not found. Please run "npm run build" first.');
+      }
+    });
+  });
+}
+
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
+  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
 });
