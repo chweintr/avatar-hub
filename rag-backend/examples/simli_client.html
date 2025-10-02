@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Art Grants Expert Avatar - Simli Integration</title>
+    <script src="https://unpkg.com/@simli-ai/simli-client@latest/dist/index.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 30px;
+        }
+        .avatar-section {
+            display: flex;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+        .video-container {
+            flex: 1;
+            background: #000;
+            border-radius: 8px;
+            overflow: hidden;
+            aspect-ratio: 16/9;
+            position: relative;
+        }
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .controls {
+            flex: 1;
+        }
+        .input-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #555;
+        }
+        input, textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .status {
+            margin-top: 20px;
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        .status.connected {
+            background: #d4edda;
+            color: #155724;
+        }
+        .status.disconnected {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .context-display {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            font-size: 14px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .response-display {
+            margin-top: 20px;
+            padding: 15px;
+            background: #e9ecef;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Art Grants & Residency Expert Avatar</h1>
+        
+        <div class="avatar-section">
+            <div class="video-container">
+                <video id="avatar-video" autoplay playsinline></video>
+            </div>
+            
+            <div class="controls">
+                <div class="input-group">
+                    <label for="api-key">Simli API Key:</label>
+                    <input type="password" id="api-key" placeholder="Enter your Simli API key">
+                </div>
+                
+                <div class="input-group">
+                    <label for="avatar-id">Avatar ID:</label>
+                    <input type="text" id="avatar-id" value="cace3ef7-a4c4-425d-a8cf-a5358eb0c427">
+                </div>
+                
+                <div class="input-group">
+                    <label for="rag-backend-url">RAG Backend URL:</label>
+                    <input type="text" id="rag-backend-url" 
+                           value="ws://localhost:8000/ws/simli" 
+                           placeholder="ws://your-backend.railway.app/ws/simli">
+                </div>
+                
+                <div class="input-group">
+                    <label for="user-query">Your Question:</label>
+                    <textarea id="user-query" 
+                              placeholder="Ask about art grants, residencies, funding opportunities, application tips...">What are the best artist residencies in Europe for emerging artists?</textarea>
+                </div>
+                
+                <button id="connect-btn" onclick="toggleConnection()">Connect Avatar</button>
+                <button id="ask-btn" onclick="askQuestion()" disabled>Ask Expert</button>
+                
+                <div id="status" class="status disconnected">
+                    Status: Disconnected
+                </div>
+                
+                <div id="context" class="context-display" style="display: none;">
+                    <strong>Retrieved Context:</strong>
+                    <div id="context-content"></div>
+                </div>
+                
+                <div id="response" class="response-display" style="display: none;">
+                    <strong>Expert Response:</strong>
+                    <div id="response-content"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let simliClient = null;
+        let ws = null;
+        let isConnected = false;
+
+        async function toggleConnection() {
+            if (isConnected) {
+                disconnect();
+            } else {
+                connect();
+            }
+        }
+
+        async function connect() {
+            const apiKey = document.getElementById('api-key').value;
+            const avatarId = document.getElementById('avatar-id').value;
+            const backendUrl = document.getElementById('rag-backend-url').value;
+            
+            if (!apiKey) {
+                alert('Please enter your Simli API key');
+                return;
+            }
+            
+            try {
+                // Connect to RAG backend WebSocket
+                ws = new WebSocket(backendUrl);
+                
+                ws.onopen = () => {
+                    console.log('Connected to RAG backend');
+                };
+                
+                ws.onmessage = (event) => {
+                    const data = JSON.parse(event.data);
+                    handleBackendMessage(data);
+                };
+                
+                ws.onerror = (error) => {
+                    console.error('WebSocket error:', error);
+                    updateStatus('Error connecting to backend', false);
+                };
+                
+                // Initialize Simli client
+                simliClient = new SimliClient(apiKey);
+                
+                simliClient.on('connected', () => {
+                    console.log('Connected to Simli');
+                    isConnected = true;
+                    updateStatus('Connected to Avatar', true);
+                    document.getElementById('connect-btn').textContent = 'Disconnect';
+                    document.getElementById('ask-btn').disabled = false;
+                });
+                
+                simliClient.on('disconnected', () => {
+                    console.log('Disconnected from Simli');
+                    isConnected = false;
+                    updateStatus('Disconnected', false);
+                });
+                
+                simliClient.on('error', (error) => {
+                    console.error('Simli error:', error);
+                    updateStatus('Error: ' + error.message, false);
+                });
+                
+                // Start avatar session
+                const videoElement = document.getElementById('avatar-video');
+                await simliClient.start(avatarId, videoElement);
+                
+            } catch (error) {
+                console.error('Connection error:', error);
+                updateStatus('Failed to connect: ' + error.message, false);
+            }
+        }
+
+        function disconnect() {
+            if (simliClient) {
+                simliClient.stop();
+                simliClient = null;
+            }
+            
+            if (ws) {
+                ws.close();
+                ws = null;
+            }
+            
+            isConnected = false;
+            updateStatus('Disconnected', false);
+            document.getElementById('connect-btn').textContent = 'Connect Avatar';
+            document.getElementById('ask-btn').disabled = true;
+        }
+
+        async function askQuestion() {
+            const query = document.getElementById('user-query').value.trim();
+            
+            if (!query) {
+                alert('Please enter a question');
+                return;
+            }
+            
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                alert('Not connected to backend');
+                return;
+            }
+            
+            // Clear previous responses
+            document.getElementById('context').style.display = 'none';
+            document.getElementById('response').style.display = 'none';
+            
+            // Send query to RAG backend
+            ws.send(JSON.stringify({
+                type: 'query',
+                content: query
+            }));
+            
+            updateStatus('Processing your question...', true);
+        }
+
+        function handleBackendMessage(data) {
+            switch (data.type) {
+                case 'context':
+                    // Display retrieved context
+                    document.getElementById('context').style.display = 'block';
+                    document.getElementById('context-content').innerHTML = 
+                        data.chunks.map(chunk => `
+                            <div style="margin-bottom: 10px; padding: 5px; background: white; border-radius: 4px;">
+                                <small style="color: #666;">${chunk.source}</small><br>
+                                ${chunk.text.substring(0, 150)}...
+                            </div>
+                        `).join('');
+                    break;
+                    
+                case 'response':
+                    // Display and speak the response
+                    document.getElementById('response').style.display = 'block';
+                    document.getElementById('response-content').textContent = data.text;
+                    
+                    if (simliClient && isConnected) {
+                        // Send text to Simli for avatar to speak
+                        simliClient.sendText(data.text);
+                    }
+                    
+                    updateStatus('Response delivered', true);
+                    break;
+                    
+                case 'error':
+                    updateStatus('Error: ' + data.message, false);
+                    break;
+                    
+                case 'processing':
+                    updateStatus(data.message, true);
+                    break;
+            }
+        }
+
+        function updateStatus(message, isSuccess) {
+            const statusElement = document.getElementById('status');
+            statusElement.textContent = 'Status: ' + message;
+            statusElement.className = 'status ' + (isSuccess ? 'connected' : 'disconnected');
+        }
+
+        // Initialize on page load
+        window.addEventListener('load', () => {
+            // Check for Simli API key in URL params (for testing)
+            const urlParams = new URLSearchParams(window.location.search);
+            const apiKey = urlParams.get('apiKey');
+            if (apiKey) {
+                document.getElementById('api-key').value = apiKey;
+            }
+        });
+    </script>
+</body>
+</html>
