@@ -86,6 +86,10 @@ class VectorStoreService:
         """Initialize Weaviate (placeholder for future implementation)"""
         raise NotImplementedError("Weaviate integration coming soon")
     
+    async def ingest_data(self):
+        """Ingest data from default knowledge base path"""
+        return await self.ingest_json_data(settings.KNOWLEDGE_BASE_PATH, force_update=False)
+    
     async def ingest_json_data(self, file_path: str, force_update: bool = False):
         """
         Ingest JSON data from file into vector store

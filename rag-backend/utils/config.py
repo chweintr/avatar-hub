@@ -42,6 +42,21 @@ class Settings(BaseSettings):
     # Railway Configuration
     RAILWAY_PUBLIC_DOMAIN: Optional[str] = Field(None, description="Railway public domain")
     
+    # Knowledge Base Configuration
+    KNOWLEDGE_BASE_PATH: str = Field("./data/art_grants_residencies_kb.json", description="Path to knowledge base JSON")
+    
+    # Update Schedule Configuration
+    UPDATE_SCHEDULE: str = Field("cron:0 0 * * *", description="Update schedule (cron or interval format)")
+    UPDATE_ON_STARTUP: bool = Field(False, description="Run update on startup")
+    
+    # Data Source Configuration
+    CUSTOM_DATA_SOURCES: Optional[str] = Field(None, description="JSON string of custom data sources")
+    ENABLE_WEB_SCRAPING: bool = Field(True, description="Enable web scraping sources")
+    SCRAPING_TIMEOUT: int = Field(30, description="Timeout for web scraping in seconds")
+    
+    # Notification Configuration
+    NOTIFICATION_WEBHOOK: Optional[str] = Field(None, description="Webhook URL for update notifications")
+    
     # Expert Persona
     SYSTEM_PROMPT: str = Field(
         """You are an expert art grant and residency advisor for artists. Your expertise includes:

@@ -16,6 +16,7 @@ from services.vector_store import VectorStoreService
 from services.retrieval import RetrievalService
 from services.llm_service import LLMService
 from services.simli_orchestrator import SimliOrchestrator
+from services.scheduler import scheduler
 from models.schemas import (
     QueryRequest, 
     QueryResponse, 
@@ -54,6 +55,9 @@ async def lifespan(app: FastAPI):
         llm_service = LLMService()
         simli_orchestrator = SimliOrchestrator(retrieval_service, llm_service)
         
+        # Start the update scheduler
+        scheduler.start()
+        
         logger.info("All services initialized successfully")
     except Exception as e:
         logger.error(f"Failed to initialize services: {e}")
@@ -63,6 +67,10 @@ async def lifespan(app: FastAPI):
     
     # Cleanup
     logger.info("Shutting down RAG Backend...")
+    
+    # Stop scheduler
+    scheduler.stop()
+    
     if vector_store_service:
         await vector_store_service.cleanup()
 
@@ -247,6 +255,45 @@ async def vector_store_info():
         }
     except Exception as e:
         logger.error(f"Error getting vector store info: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Admin endpoint to trigger manual update
+@app.post("/admin/trigger_update")
+async def trigger_manual_update(background_tasks: BackgroundTasks):
+    """Manually trigger a knowledge base update"""
+    try:
+        # Run update in background
+        background_tasks.add_task(scheduler.trigger_manual_update)
+        
+        return {
+            "status": "started",
+            "message": "Manual update triggered in background"
+        }
+    except Exception as e:
+        logger.error(f"Error triggering manual update: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Admin endpoint to get update status
+@app.get("/admin/update_status")
+async def get_update_status():
+    """Get current update scheduler status"""
+    try:
+        jobs = []
+        for job in scheduler.scheduler.get_jobs():
+            jobs.append({
+                "id": job.id,
+                "name": job.name,
+                "next_run_time": job.next_run_time.isoformat() if job.next_run_time else None,
+                "trigger": str(job.trigger)
+            })
+        
+        return {
+            "scheduler_running": scheduler._running,
+            "jobs": jobs,
+            "update_schedule": settings.UPDATE_SCHEDULE
+        }
+    except Exception as e:
+        logger.error(f"Error getting update status: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":

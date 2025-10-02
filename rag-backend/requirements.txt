@@ -16,3 +16,7 @@ python-multipart==0.0.6
 aiofiles==23.2.1
 redis==5.0.1
 tenacity==8.2.3
+beautifulsoup4==4.12.2
+lxml==4.9.3
+feedparser==6.0.10
+apscheduler==3.10.4

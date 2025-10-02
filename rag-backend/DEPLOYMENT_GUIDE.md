@@ -25,18 +25,38 @@ git commit -m "Initial RAG backend for art grants expert"
 
 In Railway dashboard, go to your service and click "Variables". Add these:
 
+### Required Variables
 ```
 OPENAI_API_KEY=sk-your-actual-openai-key-here
+```
+
+### Optional Variables (with good defaults)
+```
+# ChromaDB Configuration
 CHROMA_PERSIST_DIRECTORY=/app/chroma_db
 CHROMA_COLLECTION_NAME=art_grants_knowledge
+
+# Model Configuration
 LLM_MODEL=gpt-4o
 LLM_MAX_TOKENS=1000
 LLM_TEMPERATURE=0.7
 CHUNK_SIZE=500
 CHUNK_OVERLAP=50
 TOP_K_RESULTS=5
+
+# Knowledge Base
 KNOWLEDGE_BASE_PATH=/app/data/art_grants_residencies_kb.json
+
+# CORS (update with your frontend URL)
 CORS_ORIGINS=https://your-frontend.railway.app,http://localhost:3000
+
+# Automated Updates
+UPDATE_SCHEDULE=cron:0 0 * * *
+UPDATE_ON_STARTUP=false
+ENABLE_WEB_SCRAPING=true
+
+# Notifications (optional)
+NOTIFICATION_WEBHOOK=https://your-webhook-url.com/notify
 ```
 
 ## Step 4: Deploy Using Railway CLI
