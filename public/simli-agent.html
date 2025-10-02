@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simli Agent</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #000;
+            overflow: hidden;
+        }
+        #simli-container {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+    </style>
+</head>
+<body>
+    <div id="simli-container">
+        <!-- This is where Simli would initialize -->
+        <p style="color: white; text-align: center;">
+            Simli Agent Loading...<br>
+            <small>Face ID: <span id="faceId"></span><br>
+            Agent ID: <span id="agentId"></span></small>
+        </p>
+    </div>
+    <script>
+        // Parse URL parameters
+        const params = new URLSearchParams(window.location.search);
+        const faceId = params.get('faceId');
+        const agentId = params.get('agentId');
+        
+        // Display IDs for debugging
+        if (faceId) document.getElementById('faceId').textContent = faceId;
+        if (agentId) document.getElementById('agentId').textContent = agentId;
+        
+        // Here you would initialize Simli SDK with the provided IDs
+        // Example:
+        // initializeSimli({ faceId, agentId });
+    </script>
+</body>
+</html>

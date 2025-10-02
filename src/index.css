@@ -7,10 +7,10 @@
   line-height: 1.5;
   font-weight: 400;
 
-  /* Force dark theme for alpha projection */
-  color-scheme: dark;
-  color: #ffffff;
-  background-color: #000000;
+  /* Clean light theme */
+  color-scheme: light;
+  color: #171717;
+  background-color: #ffffff;
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -18,13 +18,13 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Remove light mode entirely for consistent alpha projection */
+/* Clean minimal body styles */
 body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-  background-color: #000000;
-  color: #ffffff;
+  background-color: #ffffff;
+  color: #171717;
 }
 
 /* Custom utility classes */

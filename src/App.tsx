@@ -1,9 +1,8 @@
-import React from 'react';
-import { AvatarHub } from './components/AvatarHub';
+import LandingApp from './components/LandingApp';
 import './App.css';
 
 function App() {
-  return <AvatarHub />;
+  return <LandingApp />;
 }
 
 export default App;
