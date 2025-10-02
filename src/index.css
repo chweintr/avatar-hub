@@ -1,0 +1,43 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  /* Force dark theme for alpha projection */
+  color-scheme: dark;
+  color: #ffffff;
+  background-color: #000000;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Remove light mode entirely for consistent alpha projection */
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background-color: #000000;
+  color: #ffffff;
+}
+
+/* Custom utility classes */
+@layer utilities {
+  .aspect-square {
+    aspect-ratio: 1 / 1;
+  }
+  
+  .mix-blend-screen {
+    mix-blend-mode: screen;
+  }
+  
+  .mix-blend-add {
+    mix-blend-mode: lighten;
+  }
+}

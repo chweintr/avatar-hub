@@ -1,0 +1,71 @@
+/* Reset and base styles for alpha projection */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+#root {
+  width: 100vw;
+  height: 100vh;
+  background: #000000;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Ensure black background for alpha projection */
+body {
+  background-color: #000000;
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Video elements for alpha blending */
+video {
+  object-fit: cover;
+  background: transparent;
+}
+
+/* Support for WebM alpha channel */
+video[src*=".webm"] {
+  background: transparent;
+}
+
+/* Ensure smooth transitions */
+* {
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Hide scrollbars */
+::-webkit-scrollbar {
+  display: none;
+}
+
+/* Button styles */
+button {
+  cursor: pointer;
+  border: none;
+  outline: none;
+  font-family: inherit;
+}
+
+/* Focus styles for accessibility */
+button:focus-visible {
+  outline: 2px solid #4f46e5;
+  outline-offset: 2px;
+}
+
+/* Ensure text is visible on black background */
+.text-white {
+  color: #ffffff;
+}
+
+/* Loading states */
+.loading {
+  pointer-events: none;
+  opacity: 0.6;
+}

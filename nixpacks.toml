@@ -1,0 +1,12 @@
+# nixpacks.toml
+[phases.setup]
+nixPkgs = ["nodejs", "npm"]
+
+[phases.install]
+cmds = ["npm ci --production=false"]
+
+[phases.build]
+cmds = ["npm run build", "npm run build:server"]
+
+[start]
+cmd = "npm run start"
