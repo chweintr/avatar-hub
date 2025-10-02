@@ -1,9 +1,9 @@
 export type DockAvatar = {
   id: "brainstormer" | "tax" | "grants" | "crit";
-  name: string;          // user-facing label
-  thumbnail?: string;    // idle image
-  simliUrl: string;      // Simli embed URL
-  description?: string;  // optional one-line description
+  name: string;
+  thumbnail?: string;
+  simliUrl: string;
+  description?: string;
 };
 
 export const AVATARS: DockAvatar[] = [
