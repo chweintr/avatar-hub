@@ -35,6 +35,19 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
 });
 
+// Simple endpoint to get Simli API key (server-side only)
+app.get('/api/simli-config', (req, res) => {
+  const apiKey = process.env.SIMLI_API_KEY || process.env.VITE_SIMLI_API_KEY;
+
+  if (!apiKey) {
+    return res.status(500).json({
+      error: 'Simli API key not configured on server'
+    });
+  }
+
+  res.json({ apiKey });
+});
+
 // API endpoint to get avatar configuration (provider-agnostic)
 app.post('/api/avatar/config', async (req, res) => {
   try {

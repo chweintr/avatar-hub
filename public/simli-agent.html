@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Simli Agent</title>
+    <style>
+        html,body{height:100%;margin:0;background:#000}
+        #root{position:absolute;inset:0;display:grid;place-items:center;color:#fff;font:14px/1.4 system-ui}
+        #video-container{position:absolute;inset:0;display:none}
+        video{width:100%;height:100%;object-fit:cover}
+    </style>
+</head>
+<body>
+    <div id="root">Loading avatar...</div>
+    <div id="video-container"></div>
+
+    <script src="https://unpkg.com/@simli-ai/simli-client@latest/dist/index.js"></script>
+    <script>
+        const root = document.getElementById('root');
+        const videoContainer = document.getElementById('video-container');
+
+        // Get config from URL
+        const params = new URLSearchParams(location.search);
+        const agentId = params.get('agentId') || params.get('id');
+        const faceId = params.get('faceId');
+
+        // Get API key from server endpoint
+        (async () => {
+            try {
+                if (!agentId || !faceId) {
+                    throw new Error('Missing agentId or faceId in URL');
+                }
+
+                root.textContent = 'Getting configuration...';
+
+                // Fetch API key from server
+                const response = await fetch('/api/simli-config');
+                if (!response.ok) throw new Error('Failed to get API key');
+                const { apiKey } = await response.json();
+
+                if (!apiKey) throw new Error('No API key configured on server');
+
+                root.textContent = 'Connecting to Simli...';
+
+                // Create video element
+                const video = document.createElement('video');
+                video.autoplay = true;
+                video.playsInline = true;
+                videoContainer.appendChild(video);
+
+                // Initialize Simli
+                const client = new SimliClient(apiKey, { agentId, faceId });
+
+                client.on('connected', () => {
+                    console.log('Connected to Simli');
+                    root.style.display = 'none';
+                    videoContainer.style.display = 'block';
+                });
+
+                client.on('disconnected', () => {
+                    console.log('Disconnected');
+                    root.style.display = 'grid';
+                    root.textContent = 'Disconnected';
+                });
+
+                client.on('error', (e) => {
+                    console.error('Simli error:', e);
+                    root.textContent = 'Connection error: ' + (e.message || 'Unknown');
+                });
+
+                await client.start(faceId, video, { agentMode: true, agentId });
+
+            } catch (error) {
+                console.error('Init error:', error);
+                root.textContent = 'Error: ' + error.message;
+            }
+        })();
+    </script>
+</body>
+</html>
