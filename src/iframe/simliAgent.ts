@@ -13,11 +13,17 @@ const qp = new URLSearchParams(location.search);
 const agentId = (qp.get("agentId") || qp.get("id") || "").trim();
 const faceId = (qp.get("faceId") || "").trim();
 
-// Railway → Vite: VITE_* variables are exposed to client code
-const apiKey = (import.meta.env.VITE_SIMLI_API_KEY as string | undefined)?.trim();
+// Get API key from query param, env var, or window global
+const apiKey = (
+  qp.get("apiKey") ||
+  (import.meta.env.VITE_SIMLI_API_KEY as string | undefined) ||
+  ((window as any).SIMLI_API_KEY as string | undefined)
+)?.trim();
 
 if (!agentId || !faceId) fail("Missing agentId or faceId");
-if (!apiKey) fail("Missing Simli API key");
+if (!apiKey) {
+  fail(`Missing Simli API key. Env: ${import.meta.env.MODE}, HasKey: ${!!import.meta.env.VITE_SIMLI_API_KEY}`);
+}
 
 // Load Simli client from CDN (keeps bundle lean)
 function loadSimliClient(): Promise<any> {

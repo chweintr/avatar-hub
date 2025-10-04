@@ -14,11 +14,17 @@ const avatarId = (qp.get("id") || "").trim();
 const faceId = (qp.get("faceId") || "").trim();
 const useRag = qp.get("useRag") === "true";
 
-// Railway → Vite: VITE_* variables are exposed to client code
-const apiKey = (import.meta.env.VITE_SIMLI_API_KEY as string | undefined)?.trim();
+// Get API key from query param, env var, or window global
+const apiKey = (
+  qp.get("apiKey") ||
+  (import.meta.env.VITE_SIMLI_API_KEY as string | undefined) ||
+  ((window as any).SIMLI_API_KEY as string | undefined)
+)?.trim();
 
 if (!faceId) fail("Missing faceId");
-if (!apiKey) fail("Missing Simli API key");
+if (!apiKey) {
+  fail(`Missing Simli API key. Env: ${import.meta.env.MODE}, HasKey: ${!!import.meta.env.VITE_SIMLI_API_KEY}`);
+}
 
 // Load Simli client from CDN
 function loadSimliClient(): Promise<any> {
