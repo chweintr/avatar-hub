@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
 
 type StageCircleProps = {
@@ -11,6 +11,7 @@ type StageCircleProps = {
 
 export default function StageCircle({ mode, simliUrl, heygenUrl, posterSrc, onDismiss }: StageCircleProps) {
   const ref = useRef<HTMLDivElement>(null);
+  const [iframeLoaded, setIframeLoaded] = useState(false);
   const mx = useMotionValue(0);
   const my = useMotionValue(0);
   const smx = useSpring(mx, { stiffness: 140, damping: 18 });
@@ -54,19 +55,35 @@ export default function StageCircle({ mode, simliUrl, heygenUrl, posterSrc, onDi
         data-testid="stage"
       >
         {mode === "simli" && simliUrl ? (
-          <iframe
-            title="Simli"
-            src={simliUrl}
-            className="absolute inset-0 h-full w-full"
-            allow="microphone; camera; autoplay; clipboard-write; fullscreen *"
-          />
+          <>
+            {!iframeLoaded && (
+              <div className="absolute inset-0 grid place-items-center text-neutral-500 text-sm">
+                Loading avatar...
+              </div>
+            )}
+            <iframe
+              onLoad={() => setIframeLoaded(true)}
+              title="Simli"
+              src={simliUrl}
+              className="absolute inset-0 h-full w-full"
+              allow="microphone; camera; autoplay; clipboard-write; fullscreen *"
+            />
+          </>
         ) : mode === "heygen" && heygenUrl ? (
-          <iframe
-            title="HeyGen"
-            src={heygenUrl}
-            className="absolute inset-0 h-full w-full"
-            allow="microphone; camera; autoplay; clipboard-write; fullscreen *"
-          />
+          <>
+            {!iframeLoaded && (
+              <div className="absolute inset-0 grid place-items-center text-neutral-500 text-sm">
+                Loading avatar...
+              </div>
+            )}
+            <iframe
+              onLoad={() => setIframeLoaded(true)}
+              title="HeyGen"
+              src={heygenUrl}
+              className="absolute inset-0 h-full w-full"
+              allow="microphone; camera; autoplay; clipboard-write; fullscreen *"
+            />
+          </>
         ) : mode === "media" ? (
           posterSrc ? (
             <img src={posterSrc} alt="stage" className="h-full w-full object-cover" />

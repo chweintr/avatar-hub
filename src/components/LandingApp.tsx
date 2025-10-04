@@ -3,6 +3,7 @@ import StageCircle from "./StageCircle";
 import { Dock } from "./Dock";
 import { FogBackground } from "./FogBackground";
 import { AVATARS, type DockAvatar } from "../config/avatars";
+import { IS_SIMLI_LIVE } from "../config/env";
 
 export default function LandingApp() {
   const [active, setActive] = useState<DockAvatar | undefined>();
@@ -27,9 +28,17 @@ export default function LandingApp() {
         {/* stage */}
         <div className="mt-10 flex justify-center">
           <StageCircle
-            mode={active?.simliUrl ? "simli" : active?.heygenUrl ? "heygen" : active ? "media" : "empty"}
-            simliUrl={active?.simliUrl}
-            heygenUrl={active?.heygenUrl}
+            mode={
+              active
+                ? active.simliUrl && IS_SIMLI_LIVE
+                  ? "simli"
+                  : active.heygenUrl && IS_SIMLI_LIVE
+                  ? "heygen"
+                  : "media"
+                : "empty"
+            }
+            simliUrl={IS_SIMLI_LIVE ? active?.simliUrl : undefined}
+            heygenUrl={IS_SIMLI_LIVE ? active?.heygenUrl : undefined}
             posterSrc={active?.thumbnail}
             onDismiss={() => setActive(undefined)}
           />
