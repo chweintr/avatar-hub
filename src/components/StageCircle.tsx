@@ -16,9 +16,9 @@ export default function StageCircle({ mode, simliUrl, heygenUrl, posterSrc, onDi
   const smx = useSpring(mx, { stiffness: 140, damping: 18 });
   const smy = useSpring(my, { stiffness: 140, damping: 18 });
 
-  // Tilt a few degrees
-  const rotateX = useTransform(smy, v => v * 6); // -6..+6
-  const rotateY = useTransform(smx, v => v * -6);
+  // Tilt capped at ±4° for polish
+  const rotateX = useTransform(smy, v => v * 4); // -4..+4
+  const rotateY = useTransform(smx, v => v * -4);
 
   function onMouseMove(e: React.MouseEvent) {
     const el = ref.current;
@@ -35,12 +35,22 @@ export default function StageCircle({ mode, simliUrl, heygenUrl, posterSrc, onDi
 
   return (
     <div className="relative grid place-items-center">
+      {/* Stronger halo behind stage */}
+      <div
+        aria-hidden
+        className="absolute -inset-10 rounded-full blur-3xl"
+        style={{
+          background:
+            "radial-gradient(closest-side, rgba(0,0,0,0.06), rgba(0,0,0,0))",
+        }}
+      />
+
       <motion.div
         ref={ref}
         onMouseMove={onMouseMove}
         onMouseLeave={onMouseLeave}
         style={{ rotateX, rotateY, transformStyle: "preserve-3d" }}
-        className="relative size-[58vmin] max-w-[640px] max-h-[640px] aspect-square rounded-full overflow-hidden shadow-[0_10px_60px_rgba(0,0,0,0.15)] bg-white ring-1 ring-neutral-900/10"
+        className="relative size-[58vmin] max-w-[640px] max-h-[640px] aspect-square rounded-full overflow-hidden shadow-stage bg-white ring-1 ring-white/70"
         data-testid="stage"
       >
         {mode === "simli" && simliUrl ? (
@@ -76,6 +86,18 @@ export default function StageCircle({ mode, simliUrl, heygenUrl, posterSrc, onDi
           <div className="absolute inset-6 rounded-full blur-2xl"
                style={{ background: "radial-gradient(closest-side, rgba(184,241,255,.18), rgba(255,255,255,0))" }} />
         </motion.div>
+
+        {/* white-to-clear ring gradient on the edge */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 rounded-full"
+          style={{
+            maskImage: "radial-gradient(circle, transparent 66%, black 70%)",
+            WebkitMaskImage: "radial-gradient(circle, transparent 66%, black 70%)",
+            background:
+              "radial-gradient(closest-side, rgba(255,255,255,0.8), rgba(255,255,255,0))",
+          }}
+        />
       </motion.div>
 
       {onDismiss && mode !== "empty" && (

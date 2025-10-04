@@ -36,9 +36,19 @@ export default function LandingApp() {
         </div>
 
         {/* dock */}
-        <div id="dock" className="mt-10 flex justify-center">
-          <Dock avatars={AVATARS} activeId={active?.id} onSelect={setActive} />
-        </div>
+        <section id="dock" className="relative mt-10 flex justify-center">
+          <div
+            aria-hidden
+            className="absolute inset-x-0 -top-8 bottom-0 mx-auto max-w-6xl rounded-[2rem] blur-2xl"
+            style={{
+              background:
+                "radial-gradient(60% 50% at 50% 0%, rgba(0,0,0,0.04), rgba(0,0,0,0))",
+            }}
+          />
+          <div className="relative z-10">
+            <Dock avatars={AVATARS} activeId={active?.id} onSelect={setActive} />
+          </div>
+        </section>
       </div>
     </div>
   );

@@ -3,36 +3,27 @@ export type DockAvatar = {
   name: string;
   thumbnail?: string;
   simliUrl: string;
-  description?: string;
 };
 
 export const AVATARS: DockAvatar[] = [
-  { 
-    id: "brainstormer", 
-    name: "Studio Brainstormer",       
-    thumbnail: "/thumbs/brainstormer.jpg", 
-    simliUrl: "/simli/brainstormer",
-    description: "Creative ideation and concept development"
+  {
+    id: "brainstormer",
+    name: "Studio Brainstormer",
+    simliUrl: "/simli/brainstormer"
   },
-  { 
-    id: "tax",          
-    name: "Tax Advisor for Artists",   
-    thumbnail: "/thumbs/tax.jpg",          
-    simliUrl: `${window.location.origin}/simli-agent.html?id=tax&faceId=afdb6a3e-3939-40aa-92df-01604c23101c&agentId=d951e6dc-c098-43fb-a34f-e970cd339ea6`,
-    description: "Deductions, quarterly taxes, and artist-specific guidance"
+  {
+    id: "tax",
+    name: "Tax Advisor for Artists",
+    simliUrl: `${window.location.origin}/simli-agent.html?id=tax&faceId=afdb6a3e-3939-40aa-92df-01604c23101c&agentId=d951e6dc-c098-43fb-a34f-e970cd339ea6`
   },
-  { 
-    id: "grants",       
-    name: "Grant / Residency Expert",  
-    thumbnail: "/thumbs/grants.jpg",       
-    simliUrl: `${window.location.origin}/simli-rag-agent.html?id=grants&faceId=cace3ef7-a4c4-425d-a8cf-a5358eb0c427&useRag=true`,
-    description: "Application strategy and eligibility assessment"
+  {
+    id: "grants",
+    name: "Grant / Residency Expert",
+    simliUrl: `${window.location.origin}/simli-rag-agent.html?id=grants&faceId=cace3ef7-a4c4-425d-a8cf-a5358eb0c427&useRag=true`
   },
-  { 
-    id: "crit",         
-    name: "Crit Partner",              
-    thumbnail: "/thumbs/crit.jpg",         
-    simliUrl: "/simli/crit",
-    description: "Constructive feedback on work-in-progress"
+  {
+    id: "crit",
+    name: "Crit Partner",
+    simliUrl: "/simli/crit"
   }
 ];
