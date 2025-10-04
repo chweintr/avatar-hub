@@ -3,13 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Simli Agent</title>
+    <title>Avatar Agent</title>
     <style>
         body {
             margin: 0;
             padding: 0;
             background: #000;
             overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         }
         #simli-container {
             width: 100vw;
@@ -17,31 +18,172 @@
             display: flex;
             align-items: center;
             justify-content: center;
+            position: relative;
+        }
+        #avatar-video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .loading {
+            color: white;
+            text-align: center;
+        }
+        .error {
+            color: #ff4444;
+            text-align: center;
+            padding: 20px;
+        }
+        .controls {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 10px;
+        }
+        button {
+            padding: 10px 20px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button:disabled {
+            background: #666;
+            cursor: not-allowed;
         }
     </style>
 </head>
 <body>
     <div id="simli-container">
-        <!-- This is where Simli would initialize -->
-        <p style="color: white; text-align: center;">
-            Simli Agent Loading...<br>
+        <video id="avatar-video" autoplay playsinline style="display: none;"></video>
+        <div id="loading" class="loading">
+            <p>Initializing Avatar...</p>
             <small>Face ID: <span id="faceId"></span><br>
-            Agent ID: <span id="agentId"></span></small>
-        </p>
+            Agent ID: <span id="agentInfo"></span></small>
+        </div>
+        <div id="error" class="error" style="display: none;"></div>
     </div>
+
+    <div class="controls" style="display: none;" id="controls">
+        <button id="muteBtn" onclick="toggleMute()">Mute</button>
+        <button id="endBtn" onclick="endSession()">End Session</button>
+    </div>
+
+    <script src="https://unpkg.com/@simli-ai/simli-client@latest/dist/index.js"></script>
     <script>
         // Parse URL parameters
         const params = new URLSearchParams(window.location.search);
+        const avatarId = params.get('id');
         const faceId = params.get('faceId');
         const agentId = params.get('agentId');
-        
+
+        let simliClient = null;
+        let isConnected = false;
+
         // Display IDs for debugging
         if (faceId) document.getElementById('faceId').textContent = faceId;
-        if (agentId) document.getElementById('agentId').textContent = agentId;
-        
-        // Here you would initialize Simli SDK with the provided IDs
-        // Example:
-        // initializeSimli({ faceId, agentId });
+        if (agentId) document.getElementById('agentInfo').textContent = `Agent ID: ${agentId}`;
+
+        async function initializeAvatar() {
+            try {
+                // Get configuration from backend
+                const response = await fetch('/api/avatar/config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        avatarId: avatarId,
+                        provider: 'simli'
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to get avatar configuration');
+                }
+
+                const { config } = await response.json();
+
+                // Initialize Simli client with agent mode
+                simliClient = new SimliClient(config.apiKey, {
+                    agentId: agentId,
+                    faceId: faceId
+                });
+
+                // Set up event handlers
+                simliClient.on('connected', () => {
+                    console.log('Connected to Simli');
+                    isConnected = true;
+                    document.getElementById('loading').style.display = 'none';
+                    document.getElementById('avatar-video').style.display = 'block';
+                    document.getElementById('controls').style.display = 'flex';
+                });
+
+                simliClient.on('disconnected', () => {
+                    console.log('Disconnected from Simli');
+                    isConnected = false;
+                    endSession();
+                });
+
+                simliClient.on('error', (error) => {
+                    console.error('Simli error:', error);
+                    showError('Avatar connection error: ' + error.message);
+                });
+
+                // Start avatar with Simli agent mode
+                const videoElement = document.getElementById('avatar-video');
+                await simliClient.start(faceId, videoElement, {
+                    agentMode: true,
+                    agentId: agentId
+                });
+
+            } catch (error) {
+                showError('Failed to initialize avatar: ' + error.message);
+            }
+        }
+
+        function toggleMute() {
+            if (simliClient) {
+                const btn = document.getElementById('muteBtn');
+                btn.textContent = btn.textContent === 'Mute' ? 'Unmute' : 'Mute';
+            }
+        }
+
+        function endSession() {
+            if (simliClient) {
+                simliClient.stop();
+                simliClient = null;
+            }
+
+            // Return to avatar hub
+            if (window.parent !== window) {
+                window.parent.postMessage({ type: 'avatar-ended' }, '*');
+            } else {
+                window.location.href = '/';
+            }
+        }
+
+        function showError(message) {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('error').style.display = 'block';
+            document.getElementById('error').textContent = message;
+        }
+
+        // Initialize on load
+        window.addEventListener('load', () => {
+            initializeAvatar();
+        });
+
+        // Handle parent messages
+        window.addEventListener('message', (event) => {
+            if (event.data.type === 'end-avatar') {
+                endSession();
+            }
+        });
     </script>
 </body>
 </html>
