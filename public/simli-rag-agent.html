@@ -98,24 +98,19 @@
         
         async function initializeAvatar() {
             try {
-                // Get configuration from backend
-                const response = await fetch('/api/avatar/config', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        avatarId: avatarId, 
-                        provider: 'simli' 
-                    })
-                });
-                
-                if (!response.ok) {
-                    throw new Error('Failed to get avatar configuration');
+                if (!faceId) {
+                    throw new Error('Missing required parameter: faceId');
                 }
-                
-                const { config } = await response.json();
-                
+
+                // Get API key from query params or env
+                const apiKey = params.get('apiKey') || import.meta.env?.VITE_SIMLI_API_KEY;
+
+                if (!apiKey) {
+                    throw new Error('Simli API key not configured');
+                }
+
                 // Initialize Simli client
-                simliClient = new SimliClient(config.apiKey);
+                simliClient = new SimliClient(apiKey);
                 
                 // Set up event handlers
                 simliClient.on('connected', () => {

@@ -77,11 +77,12 @@
 
     <script src="https://unpkg.com/@simli-ai/simli-client@latest/dist/index.js"></script>
     <script>
-        // Parse URL parameters
+        // Parse URL parameters - all config comes from query params
         const params = new URLSearchParams(window.location.search);
         const avatarId = params.get('id');
         const faceId = params.get('faceId');
         const agentId = params.get('agentId');
+        const apiKey = params.get('apiKey') || import.meta.env?.VITE_SIMLI_API_KEY;
 
         let simliClient = null;
         let isConnected = false;
@@ -92,24 +93,16 @@
 
         async function initializeAvatar() {
             try {
-                // Get configuration from backend
-                const response = await fetch('/api/avatar/config', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        avatarId: avatarId,
-                        provider: 'simli'
-                    })
-                });
-
-                if (!response.ok) {
-                    throw new Error('Failed to get avatar configuration');
+                if (!faceId || !agentId) {
+                    throw new Error('Missing required parameters: faceId and agentId');
                 }
 
-                const { config } = await response.json();
+                if (!apiKey) {
+                    throw new Error('Simli API key not configured');
+                }
 
                 // Initialize Simli client with agent mode
-                simliClient = new SimliClient(config.apiKey, {
+                simliClient = new SimliClient(apiKey, {
                     agentId: agentId,
                     faceId: faceId
                 });
@@ -142,6 +135,7 @@
                 });
 
             } catch (error) {
+                console.error('Initialization error:', error);
                 showError('Failed to initialize avatar: ' + error.message);
             }
         }
