@@ -109,10 +109,15 @@ export default function StageSimli({ faceId, agentId, scale = 0.82 }: Props) {
       // Store for cleanup
       micStreamRef.current = mic;
 
-      // CRITICAL: Don't let the audio element play back the mic (causes feedback)
-      if (audioRef.current) {
+      // CRITICAL: Ensure audio element is NOT set to the mic stream (would cause feedback)
+      // Simli sets audioRef.srcObject to the agent's response stream - don't touch it
+      if (audioRef.current?.srcObject === mic) {
         audioRef.current.srcObject = null;
-        audioRef.current.muted = false; // Unmute for agent response audio
+      }
+
+      // Ensure audio is unmuted for agent responses
+      if (audioRef.current) {
+        audioRef.current.muted = false;
       }
 
       // Send mic audio to Simli for the agent to hear
@@ -150,7 +155,7 @@ export default function StageSimli({ faceId, agentId, scale = 0.82 }: Props) {
           style={{ transform: `scale(${scale})` }}
         />
         {/* Audio element for Simli OUTPUT only (TTS/voice response) - never monitors mic input */}
-        <audio ref={audioRef} autoPlay muted={false} />
+        <audio ref={audioRef} autoPlay playsInline muted={false} />
         {/* tiny status overlay for debugging; remove later */}
         <div className="absolute inset-x-0 bottom-2 text-center text-[11px] text-white/75 pointer-events-none">
           {micEnabled ? "" : status}
