@@ -47,31 +47,42 @@ export default function ConnectOverlay({
       aria-hidden
     >
       <button
-        onClick={() => {
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+
           const win = iframeRef.current?.contentWindow;
           if (!win) return;
 
+          // Send message to trigger start
           win.postMessage({ type: "SIMLI_START" }, window.location.origin);
 
           try {
+            // Also try to click the hidden button directly
             const startBtn = win.document?.getElementById("startBtn") as
               | HTMLButtonElement
               | null;
-            startBtn?.click();
+            if (startBtn) {
+              startBtn.click();
+            }
           } catch (error) {
-            console.warn("Failed to trigger Simli start button", error);
+            // Cross-origin - message should work
+            console.warn("Cross-origin, using postMessage", error);
           }
         }}
         style={{
           position: "absolute",
-          left: `calc(${cx} - 60px)`,
-          top: `calc(${cy} + calc((${d})/2) - 80px)`,
-          width: 120,
+          left: `calc(${cx} - 70px)`,
+          top: `calc(${cy} + calc((${d})/2) - 60px)`,
+          width: 140,
           height: 44,
           borderRadius: 9999,
-          background: "black",
-          color: "white",
+          background: "white",
+          color: "black",
           border: "0",
+          fontSize: "14px",
+          fontFamily: "system-ui",
+          cursor: "pointer",
           pointerEvents: "auto",
           boxShadow: "0 10px 30px rgba(0,0,0,.18)",
         }}

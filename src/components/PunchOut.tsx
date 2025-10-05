@@ -1,7 +1,7 @@
 import React from "react";
 
 // A white overlay with a circular hole so the backdrop shows through.
-// Pointer-events none => clicks pass through the hole to the iframe.
+// The center circle allows pointer events through to the iframe below.
 export default function PunchOut({
   cx = "50%",
   cy = "40vh", // vertical center of the hole
@@ -16,13 +16,32 @@ export default function PunchOut({
     WebkitMaskImage: mask,
     maskImage: mask,
     zIndex: 15,
-    pointerEvents: "none",
+    pointerEvents: "auto", // Enable pointer events on the white area
   };
+
+  // Inline style to punch through pointer events in the center
+  const centerStyle: React.CSSProperties = {
+    position: "absolute",
+    left: `calc(${cx} - ${r})`,
+    top: `calc(${cy} - ${r})`,
+    width: `calc(${r} * 2)`,
+    height: `calc(${r} * 2)`,
+    borderRadius: "50%",
+    pointerEvents: "none", // Allow clicks through the center circle
+    zIndex: 16,
+  };
+
   return (
-    <div
-      aria-hidden
-      className="fixed inset-0 bg-white"
-      style={style}
-    />
+    <>
+      <div
+        aria-hidden
+        className="fixed inset-0 bg-white"
+        style={style}
+      />
+      <div
+        aria-hidden
+        style={centerStyle}
+      />
+    </>
   );
 }
