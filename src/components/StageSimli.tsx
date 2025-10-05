@@ -15,15 +15,7 @@ export default function StageSimli({ faceId, agentId, scale = 0.82 }: Props) {
   const [client, setClient] = useState<any>(null);
   const mountedRef = useRef(false);
   const micStreamRef = useRef<MediaStream | null>(null);
-
-  // Hard guard: never monitor mic through our elements
-  useEffect(() => {
-    if (videoRef.current) videoRef.current.muted = true; // remote video should not output audio
-    if (audioRef.current) {
-      audioRef.current.srcObject = null;  // Simli will attach its own remote stream internally
-      audioRef.current.muted = false;
-    }
-  }, []);
+  const unmuteTimer = useRef<number | null>(null);
 
   useEffect(() => {
     // Guard against StrictMode double-mount
@@ -52,9 +44,8 @@ export default function StageSimli({ faceId, agentId, scale = 0.82 }: Props) {
           faceID: faceId,         // cover both shapes
           faceId: faceId,
           videoRef: videoRef.current!,
-          audioRef: audioRef.current!,   // Simli will attach REMOTE audio here
-          // When pushing our own mic track, set false to avoid artifacts
-          handleSilence: false,
+          audioRef: audioRef.current!,   // Simli attaches REMOTE audio here
+          handleSilence: true,
           enableConsoleLogs: true,
         };
         if (agentId) cfg.agentId = agentId;
@@ -66,22 +57,23 @@ export default function StageSimli({ faceId, agentId, scale = 0.82 }: Props) {
         await init(cfg);
         if (cancelled) return;
 
-        // Auto half-duplex: mute mic while agent speaks (prevents room echo)
-        c.on?.("speaking", () => {
-          const s = micStreamRef.current;
-          s?.getAudioTracks().forEach(t => (t.enabled = false));
-        });
-        c.on?.("silent", () => {
-          const s = micStreamRef.current;
-          s?.getAudioTracks().forEach(t => (t.enabled = true));
-        });
-
+        // Avatar events
         c.on?.("connected", () => {
           console.log("Simli WebRTC connected");
         });
         c.on?.("error", (e: any) => {
           console.error(e);
           setStatus("Simli error");
+        });
+
+        // Mute output until avatar actually speaks (prevents delayed self-voice)
+        if (audioRef.current) audioRef.current.muted = true;
+        c.on?.("speaking", () => {
+          if (audioRef.current) audioRef.current.muted = false;
+          if (unmuteTimer.current) {
+            window.clearTimeout(unmuteTimer.current);
+            unmuteTimer.current = null;
+          }
         });
 
         setClient(c);
@@ -105,7 +97,7 @@ export default function StageSimli({ faceId, agentId, scale = 0.82 }: Props) {
     if (!client) return;
 
     try {
-      // 1) Start Simli session first
+      // 1) Start the session FIRST
       setStatus("Connecting…");
       const start = client.start?.bind(client) || client.connect?.bind(client);
       if (!start) {
@@ -114,23 +106,24 @@ export default function StageSimli({ faceId, agentId, scale = 0.82 }: Props) {
       }
       await start();
 
-      // 2) Now request mic (user gesture) and send ONLY to Simli
+      // 2) Now request mic and send ONLY to Simli (never to any local output)
       setStatus("Requesting mic…");
       const mic = await navigator.mediaDevices.getUserMedia({
         audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
       });
       micStreamRef.current = mic;
       const track = mic.getAudioTracks()[0];
+      if (audioRef.current?.srcObject === mic) audioRef.current.srcObject = null; // guard
+      if (track && client.listenToMediastreamTrack) await client.listenToMediastreamTrack(track);
+      else if (track && client.sendAudioTrack) await client.sendAudioTrack(track);
 
-      // Never monitor the mic locally
-      if (audioRef.current?.srcObject === mic) {
-        audioRef.current.srcObject = null;
-      }
-
-      if (track && client.listenToMediastreamTrack) {
-        await client.listenToMediastreamTrack(track);
-      } else if (track && client.sendAudioTrack) {
-        await client.sendAudioTrack(track);
+      // 3) Fail-safe: if we don't get 'speaking', unmute after 1.2s so replies are audible
+      if (audioRef.current) {
+        if (unmuteTimer.current) window.clearTimeout(unmuteTimer.current);
+        unmuteTimer.current = window.setTimeout(() => {
+          if (audioRef.current) audioRef.current.muted = false;
+          unmuteTimer.current = null;
+        }, 1200);
       }
 
       setConnected(true);
