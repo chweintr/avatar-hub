@@ -16,6 +16,15 @@ export default function StageSimli({ faceId, agentId, scale = 0.82 }: Props) {
   const mountedRef = useRef(false);
   const micStreamRef = useRef<MediaStream | null>(null);
 
+  // Hard guard: never monitor mic through our elements
+  useEffect(() => {
+    if (videoRef.current) videoRef.current.muted = true; // remote video should not output audio
+    if (audioRef.current) {
+      audioRef.current.srcObject = null;  // Simli will attach its own remote stream internally
+      audioRef.current.muted = false;
+    }
+  }, []);
+
   useEffect(() => {
     // Guard against StrictMode double-mount
     if (mountedRef.current) return;
@@ -57,18 +66,14 @@ export default function StageSimli({ faceId, agentId, scale = 0.82 }: Props) {
         await init(cfg);
         if (cancelled) return;
 
-        // Wire speaking/silent events for auto half-duplex mic gating
+        // Auto half-duplex: mute mic while agent speaks (prevents room echo)
         c.on?.("speaking", () => {
-          console.log("Agent speaking - disabling mic");
-          // Agent is speaking -> avoid echo: temporarily disable mic track
-          const mic = micStreamRef.current;
-          mic?.getAudioTracks().forEach(t => (t.enabled = false));
+          const s = micStreamRef.current;
+          s?.getAudioTracks().forEach(t => (t.enabled = false));
         });
         c.on?.("silent", () => {
-          console.log("Agent silent - enabling mic");
-          // Agent stopped -> re-enable mic so user can talk
-          const mic = micStreamRef.current;
-          mic?.getAudioTracks().forEach(t => (t.enabled = true));
+          const s = micStreamRef.current;
+          s?.getAudioTracks().forEach(t => (t.enabled = true));
         });
 
         c.on?.("connected", () => {
@@ -100,39 +105,37 @@ export default function StageSimli({ faceId, agentId, scale = 0.82 }: Props) {
     if (!client) return;
 
     try {
-      // Request mic access
+      // 1) Request mic (inside user gesture)
       setStatus("Requesting mic…");
       const mic = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true
-        }
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
       });
       micStreamRef.current = mic;
-
-      // Send ONLY the mic track to Simli (not the full stream)
       const track = mic.getAudioTracks()[0];
-      if (track && client.listenToMediastreamTrack) {
-        setStatus("Connecting…");
-        await client.listenToMediastreamTrack(track);
 
-        // CRITICAL: After Simli processes, ensure audioRef is NOT the mic
-        // Check every 100ms for 1 second to catch Simli if it sets it
-        let checks = 0;
-        const interval = setInterval(() => {
-          if (audioRef.current?.srcObject === mic) {
-            console.warn("Preventing mic feedback - clearing audioRef.srcObject");
-            audioRef.current.srcObject = null;
-          }
-          if (++checks >= 10) clearInterval(interval);
-        }, 100);
-
-        setConnected(true);
-        setStatus("Connected");
-      } else {
-        setStatus("No audio method available");
+      // 2) Ensure we are NOT monitoring mic locally
+      if (audioRef.current?.srcObject === mic) {
+        audioRef.current.srcObject = null;
       }
+
+      // 3) Give Simli the mic track (one-way → Simli)
+      if (track && client.listenToMediastreamTrack) {
+        await client.listenToMediastreamTrack(track);
+      } else if (track && client.sendAudioTrack) {
+        await client.sendAudioTrack(track);
+      }
+
+      // 4) Start Simli session
+      setStatus("Connecting…");
+      const start = client.start?.bind(client) || client.connect?.bind(client);
+      if (!start) {
+        setStatus("No start/connect on client");
+        return;
+      }
+      await start();
+
+      setConnected(true);
+      setStatus("Connected");
     } catch (e: any) {
       console.error(e);
       setStatus((e?.name === "NotAllowedError")
@@ -149,11 +152,11 @@ export default function StageSimli({ faceId, agentId, scale = 0.82 }: Props) {
           ref={videoRef}
           autoPlay
           playsInline
+          muted
           className="absolute inset-0 w-full h-full object-cover"
           style={{ transform: `scale(${scale})` }}
         />
-        {/* Plays ONLY the agent's remote audio that Simli attaches */}
-        <audio ref={audioRef} autoPlay playsInline muted={false} />
+        <audio ref={audioRef} autoPlay playsInline />
         {/* tiny status overlay for debugging; remove later */}
         <div className="absolute inset-x-0 bottom-2 text-center text-[11px] text-white/75 pointer-events-none">
           {connected ? "" : status}
