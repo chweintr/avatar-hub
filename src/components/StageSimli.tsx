@@ -13,8 +13,14 @@ export default function StageSimli({ faceId, agentId, scale = 0.82 }: Props) {
   const [ready, setReady] = useState(false);
   const [connected, setConnected] = useState(false);
   const [client, setClient] = useState<any>(null);
+  const mountedRef = useRef(false);
+  const micStreamRef = useRef<MediaStream | null>(null);
 
   useEffect(() => {
+    // Guard against StrictMode double-mount
+    if (mountedRef.current) return;
+    mountedRef.current = true;
+
     let cancelled = false;
 
     (async () => {
@@ -61,17 +67,38 @@ export default function StageSimli({ faceId, agentId, scale = 0.82 }: Props) {
       }
     })();
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      mountedRef.current = false;
+      // Cleanup mic stream
+      micStreamRef.current?.getTracks().forEach(t => t.stop());
+      micStreamRef.current = null;
+    };
   }, [faceId, agentId]);
 
   async function onConnect() {
     if (!client) return;
     // 1) Explicit mic permission (inside user gesture)
     setStatus("Requesting mic…");
-    let mic: MediaStream | undefined;
     try {
-      mic = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mic = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: false,
+        }
+      });
+
+      // Store for cleanup
+      micStreamRef.current = mic;
+
       const track = mic.getAudioTracks()[0];
+
+      // CRITICAL: Ensure audioRef never gets the mic stream (would cause monitoring/feedback)
+      if (audioRef.current?.srcObject === mic) {
+        audioRef.current.srcObject = null;
+      }
+
       // 2) Give Simli the audio source (supported by the official client)
       if (client.listenToMediastreamTrack && track) {
         client.listenToMediastreamTrack(track);
@@ -94,8 +121,9 @@ export default function StageSimli({ faceId, agentId, scale = 0.82 }: Props) {
     } catch (e: any) {
       console.error(e);
       setStatus("Start failed: " + (e?.message ?? String(e)));
-      // Optional: stop mic if start failed
-      try { mic?.getTracks().forEach(t => t.stop()); } catch {}
+      // Stop mic if start failed
+      micStreamRef.current?.getTracks().forEach(t => t.stop());
+      micStreamRef.current = null;
     }
   }
 
@@ -110,7 +138,8 @@ export default function StageSimli({ faceId, agentId, scale = 0.82 }: Props) {
           className="absolute inset-0 w-full h-full object-cover"
           style={{ transform: `scale(${scale})` }}
         />
-        <audio ref={audioRef} autoPlay />
+        {/* Audio element for Simli OUTPUT only (TTS/voice response) - never monitors mic input */}
+        <audio ref={audioRef} autoPlay muted={false} />
         {/* tiny status overlay for debugging; remove later */}
         <div className="absolute inset-x-0 bottom-2 text-center text-[11px] text-white/75 pointer-events-none">
           {connected ? "" : status}
