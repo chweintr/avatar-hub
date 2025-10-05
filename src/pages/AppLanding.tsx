@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import StageSimli from "../components/StageSimli";
+import StageLiveKit from "../components/StageLiveKit";
 import { Dock } from "../components/Dock";
 import { AVATARS } from "../config/avatars";
 import NavBar from "../components/NavBar";
@@ -26,7 +26,7 @@ export default function AppLanding() {
         {/* Stage area */}
         <section className="mt-10 flex justify-center">
           {active ? (
-            <StageSimli faceId={active.faceId} agentId={active.agentId} scale={active.scale} />
+            <StageLiveKit roomName={active.room} />
           ) : (
             <div
               className="rounded-full"

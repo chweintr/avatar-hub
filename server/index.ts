@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import fs from 'fs';
+import { AccessToken } from 'livekit-server-sdk';
 
 dotenv.config();
 
@@ -46,6 +47,29 @@ app.get('/api/simli-config', (req, res) => {
   }
 
   res.json({ apiKey });
+});
+
+// LiveKit token endpoint
+app.get('/api/livekit-token', async (req, res) => {
+  const room = String(req.query.room || 'avatar-hub');
+  const user = String(req.query.user || `viewer-${Math.random().toString(36).slice(2)}`);
+
+  const apiKey = process.env.LIVEKIT_API_KEY;
+  const apiSecret = process.env.LIVEKIT_API_SECRET;
+  const url = process.env.LIVEKIT_URL;
+
+  if (!apiKey || !apiSecret || !url) {
+    return res.status(500).json({ error: 'LiveKit env missing' });
+  }
+
+  const at = new AccessToken(apiKey, apiSecret, {
+    identity: user,
+    ttl: '1h'
+  });
+
+  at.addGrant({ roomJoin: true, room, canPublish: true, canSubscribe: true });
+
+  res.json({ url, token: await at.toJwt() });
 });
 
 // API endpoint to get avatar configuration (provider-agnostic)
