@@ -39,8 +39,7 @@ export default function StageSimli({ faceId, agentId, scale = 0.82 }: Props) {
 
         const cfg: any = {
           apiKey,
-          faceID: faceId,
-          faceId: faceId,
+          faceID: faceId,  // Capital ID as per Simli docs
           videoRef: videoRef.current!,
           audioRef: audioRef.current!,
           handleSilence: false,  // Required when using listenToMediastreamTrack
