@@ -5,7 +5,7 @@ import type { DockAvatar } from '../config/avatars';
 type DockProps = {
   avatars: DockAvatar[];
   activeId?: string;
-  onSelect: (a: DockAvatar) => void;
+  onSelect: (id: string) => void;
 };
 
 function DockChip({
@@ -15,14 +15,14 @@ function DockChip({
 }: {
   item: DockAvatar;
   activeId?: string;
-  onClick: (a: DockAvatar) => void;
+  onClick: (id: string) => void;
 }) {
   const isActive = item.id === activeId;
   const bg = item.thumbnail ? undefined : gradientThumb(item.name);
 
   return (
     <button
-      onClick={() => onClick(item)}
+      onClick={() => onClick(item.id)}
       className="group flex flex-col items-center text-center select-none"
       aria-label={item.name}
       data-testid={`dock-avatar-${item.id}`}

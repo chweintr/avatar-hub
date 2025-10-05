@@ -1,8 +1,8 @@
-import LandingApp from './components/LandingApp';
+import AppLanding from './pages/AppLanding';
 import './App.css';
 
 function App() {
-  return <LandingApp />;
+  return <AppLanding />;
 }
 
 export default App;
