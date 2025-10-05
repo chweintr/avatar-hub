@@ -23,7 +23,7 @@ function DockChip({
   return (
     <button
       onClick={() => onClick(item)}
-      className="group flex w-[8.5rem] flex-col items-center text-center select-none"
+      className="group flex flex-col items-center text-center select-none"
       aria-label={item.name}
       data-testid={`dock-avatar-${item.id}`}
     >
@@ -62,20 +62,14 @@ function DockChip({
         {/* Enhanced ring glow on hover */}
         <div className="pointer-events-none absolute inset-0 rounded-full ring-[1.5px] ring-white/40 mix-blend-overlay transition-all duration-300 group-hover:ring-white/60" />
         <div className="pointer-events-none absolute inset-0 rounded-full shadow-[0_0_0_0_rgba(255,255,255,0)] transition-all duration-300 group-hover:shadow-[0_0_20px_4px_rgba(255,255,255,0.3)]" />
-      </motion.div>
 
-      {/* Label under chip */}
-      <div className="mt-3">
-        <div className="text-balance line-clamp-2 text-[clamp(12px,1.6vw,13px)] font-medium text-neutral-800">
-          {item.name}
+        {/* Label ON the circle - centered with dark text */}
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+          <div className="text-balance line-clamp-2 px-2 text-[clamp(11px,1.5vw,12px)] font-semibold text-neutral-800 drop-shadow-sm">
+            {item.name}
+          </div>
         </div>
-        <div className="mt-1 text-[11px] text-neutral-500">
-          {item.id === "brainstormer" && "Ideas & prompts"}
-          {item.id === "tax" && "Deductions, filing, 1099s"}
-          {item.id === "grants" && "Eligibility & calendar"}
-          {item.id === "crit" && "Structured feedback"}
-        </div>
-      </div>
+      </motion.div>
     </button>
   );
 }
