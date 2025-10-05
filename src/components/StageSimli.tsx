@@ -18,10 +18,7 @@ export default function StageSimli({ faceId, agentId, scale = 0.82 }: Props) {
   const unmuteTimer = useRef<number | null>(null);
 
   useEffect(() => {
-    // Guard against StrictMode double-mount
-    if (mountedRef.current) return;
-    mountedRef.current = true;
-
+    let clientInstance: any = null;
     let cancelled = false;
 
     (async () => {
@@ -38,14 +35,15 @@ export default function StageSimli({ faceId, agentId, scale = 0.82 }: Props) {
 
         setStatus("Creating client…");
         const c = new SimliClient();
+        clientInstance = c;
 
         const cfg: any = {
           apiKey,
-          faceID: faceId,         // cover both shapes
+          faceID: faceId,
           faceId: faceId,
           videoRef: videoRef.current!,
-          audioRef: audioRef.current!,   // Simli attaches REMOTE audio here
-          handleSilence: false,  // Recommended for conversational AI
+          audioRef: audioRef.current!,
+          handleSilence: false,  // Required when using listenToMediastreamTrack
           enableConsoleLogs: true,
         };
         if (agentId) cfg.agentId = agentId;
@@ -85,10 +83,21 @@ export default function StageSimli({ faceId, agentId, scale = 0.82 }: Props) {
 
     return () => {
       cancelled = true;
-      mountedRef.current = false;
       // Cleanup mic stream
-      micStreamRef.current?.getTracks().forEach(t => t.stop());
-      micStreamRef.current = null;
+      if (micStreamRef.current) {
+        micStreamRef.current.getTracks().forEach(t => t.stop());
+        micStreamRef.current = null;
+      }
+      // Cleanup Simli client
+      if (clientInstance) {
+        try {
+          clientInstance.stop?.();
+          clientInstance.disconnect?.();
+          clientInstance.close?.();
+        } catch (e) {
+          console.error("Cleanup error:", e);
+        }
+      }
     };
   }, [faceId, agentId]);
 
