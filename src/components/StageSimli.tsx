@@ -68,7 +68,11 @@ export default function StageSimli({ faceId, agentId, scale = 0.82 }: Props) {
         });
 
         c.on?.("speaking", () => {
-          console.log("Avatar speaking");
+          if (audioRef.current) audioRef.current.muted = false;
+          if (unmuteTimer.current) {
+            window.clearTimeout(unmuteTimer.current);
+            unmuteTimer.current = null;
+          }
         });
 
         setClient(c);
@@ -92,8 +96,8 @@ export default function StageSimli({ faceId, agentId, scale = 0.82 }: Props) {
     if (!client) return;
 
     try {
-      // 1) Start WebRTC FIRST per docs: Initialize → start() → send audio
-      setStatus("Starting session…");
+      // 1) Start the session FIRST
+      setStatus("Connecting…");
       const start = client.start?.bind(client) || client.connect?.bind(client);
       if (!start) {
         setStatus("No start/connect on client");
@@ -101,7 +105,7 @@ export default function StageSimli({ faceId, agentId, scale = 0.82 }: Props) {
       }
       await start();
 
-      // 2) THEN get mic (user gesture required)
+      // 2) Now request mic and send ONLY to Simli (never to any local output)
       setStatus("Requesting mic…");
       const mic = await navigator.mediaDevices.getUserMedia({
         audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
@@ -113,11 +117,21 @@ export default function StageSimli({ faceId, agentId, scale = 0.82 }: Props) {
       if (audioRef.current?.srcObject === mic) audioRef.current.srcObject = null;
       if (videoRef.current?.srcObject === mic) videoRef.current.srcObject = null;
 
-      // 3) THEN send mic to Simli (after start())
+      // Give Simli the mic track (one way → Simli)
       if (track && client.listenToMediastreamTrack) {
         await client.listenToMediastreamTrack(track);
       } else if (track && client.sendAudioTrack) {
         await client.sendAudioTrack(track);
+      }
+
+      // Mute output until avatar actually speaks (avoid any loopback artifact)
+      if (audioRef.current) {
+        audioRef.current.muted = true;
+        if (unmuteTimer.current) window.clearTimeout(unmuteTimer.current);
+        unmuteTimer.current = window.setTimeout(() => {
+          if (audioRef.current) audioRef.current.muted = false;
+          unmuteTimer.current = null;
+        }, 1200); // fail-safe if 'speaking' event never fires
       }
 
       setConnected(true);
