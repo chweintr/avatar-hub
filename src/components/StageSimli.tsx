@@ -145,7 +145,7 @@ export default function StageSimli({ faceId, agentId, scale = 0.82 }: Props) {
           className="absolute inset-0 w-full h-full object-cover"
           style={{ transform: `scale(${scale})` }}
         />
-        <audio ref={audioRef} autoPlay playsInline />
+        <audio ref={audioRef} autoPlay playsInline muted />
         {/* tiny status overlay for debugging; remove later */}
         <div className="absolute inset-x-0 bottom-2 text-center text-[11px] text-white/75 pointer-events-none">
           {connected ? "" : status}
