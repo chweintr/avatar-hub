@@ -111,17 +111,23 @@ export default function StageSimli({ faceId, agentId, scale = 0.82 }: Props) {
       });
       micStreamRef.current = mic;
 
-      // CRITICAL: Ensure audioRef never gets the mic stream
-      if (audioRef.current) {
-        audioRef.current.srcObject = null;
-        audioRef.current.muted = false;
-      }
-
       // Send ONLY the mic track to Simli (not the full stream)
       const track = mic.getAudioTracks()[0];
       if (track && client.listenToMediastreamTrack) {
         setStatus("Connecting…");
         await client.listenToMediastreamTrack(track);
+
+        // CRITICAL: After Simli processes, ensure audioRef is NOT the mic
+        // Check every 100ms for 1 second to catch Simli if it sets it
+        let checks = 0;
+        const interval = setInterval(() => {
+          if (audioRef.current?.srcObject === mic) {
+            console.warn("Preventing mic feedback - clearing audioRef.srcObject");
+            audioRef.current.srcObject = null;
+          }
+          if (++checks >= 10) clearInterval(interval);
+        }, 100);
+
         setConnected(true);
         setStatus("Connected");
       } else {
