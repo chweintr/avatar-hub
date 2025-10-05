@@ -1,0 +1,13 @@
+{
+  "name": "avatar-hub-api",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "express": "^4.19.2",
+    "cors": "^2.8.5",
+    "livekit-server-sdk": "^2.4.0"
+  },
+  "scripts": {
+    "start": "node server/index.js"
+  }
+}
