@@ -7,76 +7,119 @@
     <style>
       :root { --simli-scale: 0.82; --circle-d: min(58vmin, 640px); --circle-cy: 40vh; }
       html,body{height:100%;margin:0;background:#000}
-      #video{position:fixed;left:50%;top:50%;
-             transform:translate(-50%,-50%) scale(var(--simli-scale));
-             width:100vw;height:100vh;object-fit:cover;background:#000}
+      #video{
+        position:fixed;left:50%;top:50%;
+        transform:translate(-50%,-50%) scale(var(--simli-scale));
+        width:100vw;height:100vh;object-fit:cover;background:#000;
+        outline: 2px solid rgba(255,0,0,.15);
+      }
       #audio{display:none}
-      #status{position:fixed;inset:0;display:grid;place-items:center;color:#fff;font:14px system-ui}
+      #status{
+        position:fixed;inset:0;display:grid;place-items:center;
+        color:#fff;font:14px/1.4 system-ui;text-align:center;pointer-events:none
+      }
       #startBtn{
-        position:fixed;
-        left:calc(50% - 70px);
+        position:fixed;left:calc(50% - 70px);
         top:calc(var(--circle-cy) + (var(--circle-d) / 2) - 60px);
-        width:140px;height:44px;border-radius:9999px;border:0;
-        background:#000;color:#fff;font:14px/44px system-ui;cursor:pointer;
-        box-shadow:0 10px 30px rgba(0,0,0,.18);
+        width:140px;height:44px;border-radius:9999px;border:0;background:#000;color:#fff;
+        font:14px/44px system-ui;cursor:pointer;box-shadow:0 10px 30px rgba(0,0,0,.18)
       }
     </style>
   </head>
   <body>
-    <div id="status">Connecting…</div>
+    <div id="status">Booting…</div>
     <video id="video" autoplay playsinline></video>
     <audio id="audio" autoplay></audio>
     <button id="startBtn">Connect</button>
 
     <script type="module">
-      import { SimliClient } from "https://cdn.jsdelivr.net/npm/simli-client@latest/+esm";
-
       const status  = document.getElementById("status");
       const startBtn= document.getElementById("startBtn");
       const video   = document.getElementById("video");
       const audio   = document.getElementById("audio");
 
-      const qp = new URLSearchParams(location.search);
-      const faceID  = qp.get("faceId") || "";
-      const agentId = qp.get("agentId") || "";
-      const scaleQP = parseFloat(qp.get("scale") || "");
-      if (!Number.isNaN(scaleQP)) {
-        document.documentElement.style.setProperty("--simli-scale", String(scaleQP));
+      const log = (msg) => { console.log("[simli]", msg); status.textContent = msg; };
+
+      try {
+        const qp = new URLSearchParams(location.search);
+        const faceID  = (qp.get("faceId") || "").trim();
+        const scaleQP = parseFloat(qp.get("scale") || "");
+        if (!Number.isNaN(scaleQP)) {
+          document.documentElement.style.setProperty("--simli-scale", String(scaleQP));
+        }
+        if (!faceID) throw new Error("Missing faceId");
+
+        log("Fetching API key…");
+        const r = await fetch("/api/simli-config", { cache: "no-store" });
+        if (!r.ok) throw new Error("Failed to get API key");
+        const { apiKey } = await r.json();
+        if (!apiKey) throw new Error("Empty API key");
+
+        log("Loading SDK…");
+        const mod = await import("https://unpkg.com/simli-client@latest/dist/index.js");
+        const SimliClient = mod?.SimliClient || mod?.default || (window).SimliClient;
+        if (!SimliClient) throw new Error("SDK export not found");
+
+        log("Creating client…");
+        const client = new SimliClient();
+
+        const initCfg = {
+          apiKey,
+          faceID,
+          faceId: faceID,
+          videoRef: video,
+          audioRef: audio,
+          handleSilence: true,
+          enableConsoleLogs: true
+        };
+
+        const initFn = (typeof client.Initialize === "function")
+          ? client.Initialize.bind(client)
+          : (typeof client.initialize === "function")
+            ? client.initialize.bind(client)
+            : null;
+        if (!initFn) throw new Error("No Initialize/initialize on client");
+
+        log("Initializing…");
+        await initFn(initCfg);
+
+        status.textContent = "Ready. Click Connect.";
+        startBtn.onclick = async () => {
+          startBtn.disabled = true;
+          try {
+            log("Starting…");
+            const startFn = (typeof client.start === "function")
+              ? client.start.bind(client)
+              : (typeof client.connect === "function")
+                ? client.connect.bind(client)
+                : null;
+            if (!startFn) throw new Error("No start/connect method on client");
+            await startFn();
+            startBtn.style.display = "none";
+            log("Connected.");
+          } catch (e) {
+            console.error(e);
+            startBtn.disabled = false;
+            status.textContent = "Start failed: " + (e?.message || e);
+          }
+        };
+
+        client.on?.("connected",  () => { log("Connected (event)."); });
+        client.on?.("failed",     () => { status.textContent = "Simli failed"; });
+        client.on?.("error", (e)  => { console.error(e); status.textContent = "Simli error"; });
+
+        window.addEventListener("message", (e) => {
+          if (e.origin !== location.origin) return;
+          if (e.data?.type === "SIMLI_SET_SCALE") {
+            const v = Number(e.data?.payload);
+            if (!Number.isNaN(v)) document.documentElement.style.setProperty("--simli-scale", String(v));
+          }
+        });
+
+      } catch (e) {
+        console.error(e);
+        status.textContent = "Init error: " + (e?.message || e);
       }
-
-      if (!faceID) { status.textContent = "Missing faceId"; throw new Error("no faceId"); }
-
-      const r = await fetch("/api/simli-config");
-      if (!r.ok) { status.textContent = "Failed to get API key"; throw new Error("boot 500"); }
-      const { apiKey } = await r.json();
-
-      const client = new SimliClient();
-      client.Initialize({
-        apiKey, faceID,
-        videoRef: video, audioRef: audio,
-        handleSilence: true, enableConsoleLogs: true,
-      });
-
-      startBtn.addEventListener("click", async () => {
-        try {
-          await client.start();
-          startBtn.style.display = "none";
-        } catch (e) {
-          console.error(e);
-          status.textContent = "Permission blocked. Click again.";
-        }
-      });
-
-      client.on("connected", () => { status.style.display = "none"; });
-      client.on("error", (e) => { console.error(e); status.textContent = "Simli error"; });
-
-      window.addEventListener("message", (e) => {
-        if (e.origin !== location.origin) return;
-        if (e.data?.type === "SIMLI_SET_SCALE") {
-          const v = Number(e.data?.payload);
-          if (!Number.isNaN(v)) document.documentElement.style.setProperty("--simli-scale", String(v));
-        }
-      });
     </script>
   </body>
 </html>

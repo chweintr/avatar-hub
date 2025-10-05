@@ -7,37 +7,41 @@
     <style>
       :root { --simli-scale: 0.82; --circle-d: min(58vmin, 640px); --circle-cy: 40vh; }
       html,body{height:100%;margin:0;background:#000}
-      #video{position:fixed;left:50%;top:50%;
-             transform:translate(-50%,-50%) scale(var(--simli-scale));
-             width:100vw;height:100vh;object-fit:cover;background:#000}
+      #video{
+        position:fixed;left:50%;top:50%;
+        transform:translate(-50%,-50%) scale(var(--simli-scale));
+        width:100vw;height:100vh;object-fit:cover;background:#000;
+        outline: 2px solid rgba(255,0,0,.15);
+      }
       #audio{display:none}
-      #status{position:fixed;inset:0;display:grid;place-items:center;color:#fff;font:14px system-ui}
+      #status{
+        position:fixed;inset:0;display:grid;place-items:center;
+        color:#fff;font:14px/1.4 system-ui;text-align:center;pointer-events:none
+      }
       #startBtn{
-        position:fixed;
-        left:calc(50% - 70px);
+        position:fixed;left:calc(50% - 70px);
         top:calc(var(--circle-cy) + (var(--circle-d) / 2) - 60px);
-        width:140px;height:44px;border-radius:9999px;border:0;
-        background:#000;color:#fff;font:14px/44px system-ui;cursor:pointer;
-        box-shadow:0 10px 30px rgba(0,0,0,.18);
+        width:140px;height:44px;border-radius:9999px;border:0;background:#000;color:#fff;
+        font:14px/44px system-ui;cursor:pointer;box-shadow:0 10px 30px rgba(0,0,0,.18)
       }
     </style>
   </head>
   <body>
-    <div id="status">Connecting to RAG-powered avatar…</div>
+    <div id="status">Booting RAG agent…</div>
     <video id="video" autoplay playsinline></video>
     <audio id="audio" autoplay></audio>
     <button id="startBtn">Connect</button>
 
     <script type="module">
-      import { SimliClient } from "https://cdn.jsdelivr.net/npm/simli-client@latest/+esm";
-
       const status   = document.getElementById("status");
       const startBtn = document.getElementById("startBtn");
       const video    = document.getElementById("video");
       const audio    = document.getElementById("audio");
 
+      const log = (msg) => { console.log("[simli-rag]", msg); status.textContent = msg; };
+
       const qp       = new URLSearchParams(location.search);
-      const faceID   = qp.get("faceId") || "";
+      const faceID   = (qp.get("faceId") || "").trim();
       const avatarId = qp.get("id");
       const useRag   = qp.get("useRag") === "true";
       const scaleQP  = parseFloat(qp.get("scale") || "");
@@ -47,61 +51,84 @@
 
       let ragWebSocket = null;
 
-      if (!faceID) {
-        status.textContent = "Missing faceId";
-        throw new Error("no faceId");
-      }
-
       try {
-        const r = await fetch("/api/simli-config");
-        if (!r.ok) {
-          status.textContent = "Failed to get API key";
-          throw new Error("API key fetch failed");
-        }
-        const { apiKey } = await r.json();
+        if (!faceID) throw new Error("Missing faceId");
 
+        log("Fetching API key…");
+        const r = await fetch("/api/simli-config", { cache: "no-store" });
+        if (!r.ok) throw new Error("Failed to get API key");
+        const { apiKey } = await r.json();
+        if (!apiKey) throw new Error("Empty API key");
+
+        log("Loading SDK…");
+        const mod = await import("https://unpkg.com/simli-client@latest/dist/index.js");
+        const SimliClient = mod?.SimliClient || mod?.default || (window).SimliClient;
+        if (!SimliClient) throw new Error("SDK export not found");
+
+        log("Creating client…");
         const client = new SimliClient();
-        client.Initialize({
+
+        const initCfg = {
           apiKey,
           faceID,
+          faceId: faceID,
           handleSilence: true,
           maxSessionLength: 3600,
           maxIdleTime: 600,
           videoRef: video,
           audioRef: audio,
           enableConsoleLogs: true,
-        });
+        };
 
-        startBtn.addEventListener("click", async () => {
+        const initFn = (typeof client.Initialize === "function")
+          ? client.Initialize.bind(client)
+          : (typeof client.initialize === "function")
+            ? client.initialize.bind(client)
+            : null;
+        if (!initFn) throw new Error("No Initialize/initialize on client");
+
+        log("Initializing…");
+        await initFn(initCfg);
+
+        status.textContent = "Ready. Click Connect.";
+        startBtn.onclick = async () => {
+          startBtn.disabled = true;
           try {
-            await client.start();
+            log("Starting…");
+            const startFn = (typeof client.start === "function")
+              ? client.start.bind(client)
+              : (typeof client.connect === "function")
+                ? client.connect.bind(client)
+                : null;
+            if (!startFn) throw new Error("No start/connect method on client");
+            await startFn();
             startBtn.style.display = "none";
+            log("Connected.");
           } catch (e) {
             console.error(e);
-            status.textContent = "Permission blocked. Click again.";
+            startBtn.disabled = false;
+            status.textContent = "Start failed: " + (e?.message || e);
           }
-        });
+        };
 
-        client.on("connected", () => {
-          console.log("Connected to Simli");
-          status.style.display = "none";
-
+        client.on?.("connected", () => {
+          log("Connected (event).");
           if (useRag && avatarId === "grants") {
             connectToRAG();
           }
         });
 
-        client.on("failed", () => {
-          status.textContent = "Simli connection failed";
+        client.on?.("failed", () => {
+          status.textContent = "Simli failed";
           if (ragWebSocket) ragWebSocket.close();
         });
 
-        client.on("error", (err) => {
+        client.on?.("error", (err) => {
           console.error("Simli error:", err);
           status.textContent = "Simli error";
         });
 
-        client.on("speech", (data) => {
+        client.on?.("speech", (data) => {
           console.log("User said:", data.text);
           if (useRag && ragWebSocket && ragWebSocket.readyState === WebSocket.OPEN) {
             ragWebSocket.send(JSON.stringify({ type: "query", text: data.text }));
@@ -142,9 +169,9 @@
           }
         });
 
-      } catch (error) {
-        console.error("Init error:", error);
-        status.textContent = "Error: " + error.message;
+      } catch (e) {
+        console.error(e);
+        status.textContent = "Init error: " + (e?.message || e);
       }
     </script>
   </body>
