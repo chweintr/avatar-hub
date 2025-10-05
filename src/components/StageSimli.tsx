@@ -60,8 +60,24 @@ export default function StageSimli({ faceId, agentId, scale = 0.82 }: Props) {
         c.on?.("error",     (e: any) => { console.error(e); setStatus("Simli error"); });
 
         setClient(c);
-        setReady(true);
-        setStatus("Ready");
+
+        // Start Simli immediately to show the avatar (idle state)
+        setStatus("Starting avatar…");
+        const start = (c.start && c.start.bind(c)) || (c.connect && c.connect.bind(c));
+        if (start) {
+          try {
+            await start();
+            setReady(true);
+            setStatus("Ready. Click Connect.");
+          } catch (e: any) {
+            console.error("Auto-start failed:", e);
+            setReady(true);
+            setStatus("Ready. Click Connect.");
+          }
+        } else {
+          setReady(true);
+          setStatus("Ready. Click Connect.");
+        }
       } catch (e: any) {
         if (!cancelled) setStatus("Init error: " + (e?.message ?? String(e)));
       }
@@ -78,7 +94,7 @@ export default function StageSimli({ faceId, agentId, scale = 0.82 }: Props) {
 
   async function onConnect() {
     if (!client) return;
-    // 1) Explicit mic permission (inside user gesture)
+    // Enable microphone for voice interaction
     setStatus("Requesting mic…");
     try {
       const mic = await navigator.mediaDevices.getUserMedia({
@@ -99,31 +115,16 @@ export default function StageSimli({ faceId, agentId, scale = 0.82 }: Props) {
         audioRef.current.srcObject = null;
       }
 
-      // 2) Give Simli the audio source (supported by the official client)
+      // Give Simli the audio source for voice interaction
       if (client.listenToMediastreamTrack && track) {
         client.listenToMediastreamTrack(track);
       }
+
+      setConnected(true);
+      setStatus("Listening…");
     } catch (e: any) {
       console.error(e);
       setStatus("Mic blocked: " + (e?.message ?? String(e)));
-      return;
-    }
-
-    // 3) Start the WebRTC session
-    setStatus("Starting…");
-    const start =
-      (client.start && client.start.bind(client)) ||
-      (client.connect && client.connect.bind(client));
-    if (!start) { setStatus("No start/connect on client"); return; }
-    try {
-      await start();
-      setStatus("Connected");
-    } catch (e: any) {
-      console.error(e);
-      setStatus("Start failed: " + (e?.message ?? String(e)));
-      // Stop mic if start failed
-      micStreamRef.current?.getTracks().forEach(t => t.stop());
-      micStreamRef.current = null;
     }
   }
 
