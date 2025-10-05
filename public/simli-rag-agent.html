@@ -1,117 +1,125 @@
-<!DOCTYPE html>
+<!doctype html>
 <html>
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width,initial-scale=1">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>RAG-Powered Avatar</title>
     <style>
-        html,body{height:100%;margin:0;background:#000}
-        #root{position:absolute;inset:0;display:grid;place-items:center;color:#fff;font:14px/1.4 system-ui}
-        #video-container{position:absolute;inset:0;display:none}
-        video{width:100%;height:100%;object-fit:cover}
+      html,body{height:100%;margin:0;background:#000}
+      #root{position:absolute;inset:0;display:grid;place-items:center;color:#fff;font:14px/1.4 system-ui}
+      #video-container{position:absolute;inset:0;display:none}
+      video,audio{width:0;height:0}
     </style>
-</head>
-<body>
-    <div id="root">Loading RAG-powered avatar...</div>
-    <div id="video-container"></div>
+  </head>
+  <body>
+    <div id="root">Connecting to RAG-powered avatar…</div>
+    <div id="video-container">
+      <video id="video" autoplay playsinline></video>
+      <audio id="audio" autoplay></audio>
+    </div>
 
-    <script src="https://unpkg.com/@simli-ai/simli-client@latest/dist/index.js"></script>
-    <script>
-        const root = document.getElementById('root');
-        const videoContainer = document.getElementById('video-container');
+    <script type="module">
+      import { SimliClient } from "https://unpkg.com/simli-client@latest/dist/index.js";
 
-        // Get config from URL
-        const params = new URLSearchParams(location.search);
-        const avatarId = params.get('id');
-        const faceId = params.get('faceId');
-        const useRag = params.get('useRag') === 'true';
+      const root   = document.getElementById("root");
+      const video  = document.getElementById("video");
+      const audio  = document.getElementById("audio");
 
-        let ragWebSocket = null;
+      const qp       = new URLSearchParams(location.search);
+      const faceID   = qp.get("faceId");
+      const avatarId = qp.get("id");
+      const useRag   = qp.get("useRag") === "true";
 
-        (async () => {
-            try {
-                if (!faceId) {
-                    throw new Error('Missing faceId in URL');
-                }
+      let ragWebSocket = null;
 
-                root.textContent = 'Getting configuration...';
+      if (!faceID) {
+        root.textContent = "Missing faceId";
+        throw new Error("no faceId");
+      }
 
-                // Fetch API key from server
-                const response = await fetch('/api/simli-config');
-                if (!response.ok) throw new Error('Failed to get API key');
-                const { apiKey } = await response.json();
+      try {
+        // Get the API key from server
+        const r = await fetch("/api/simli-config");
+        if (!r.ok) {
+          root.textContent = "Failed to get API key";
+          throw new Error("API key fetch failed");
+        }
+        const { apiKey } = await r.json();
 
-                if (!apiKey) throw new Error('No API key configured on server');
+        // Initialize Simli client
+        const client = new SimliClient();
+        client.Initialize({
+          apiKey,
+          faceID,
+          handleSilence: true,
+          maxSessionLength: 3600,
+          maxIdleTime: 600,
+          videoRef: video,
+          audioRef: audio,
+          enableConsoleLogs: true,
+        });
 
-                root.textContent = 'Connecting to avatar...';
+        client.on("connected", () => {
+          console.log("Connected to Simli");
+          root.style.display = "none";
 
-                // Create video element
-                const video = document.createElement('video');
-                video.autoplay = true;
-                video.playsInline = true;
-                videoContainer.appendChild(video);
+          // Connect to RAG backend if enabled
+          if (useRag && avatarId === "grants") {
+            connectToRAG();
+          }
+        });
 
-                // Initialize Simli
-                const client = new SimliClient(apiKey);
+        client.on("failed", () => {
+          root.textContent = "Simli connection failed";
+          if (ragWebSocket) ragWebSocket.close();
+        });
 
-                client.on('connected', () => {
-                    console.log('Connected to Simli');
-                    root.style.display = 'none';
-                    videoContainer.style.display = 'block';
+        client.on("error", (err) => {
+          console.error("Simli error:", err);
+          root.textContent = "Simli error";
+        });
 
-                    if (useRag && avatarId === 'grants') {
-                        connectToRAG();
-                    }
-                });
+        // Handle speech-to-text from Simli
+        client.on("speech", (data) => {
+          console.log("User said:", data.text);
+          if (useRag && ragWebSocket && ragWebSocket.readyState === WebSocket.OPEN) {
+            ragWebSocket.send(JSON.stringify({ type: "query", text: data.text }));
+          }
+        });
 
-                client.on('disconnected', () => {
-                    console.log('Disconnected');
-                    root.style.display = 'grid';
-                    root.textContent = 'Disconnected';
-                    if (ragWebSocket) ragWebSocket.close();
-                });
+        await client.start();
 
-                client.on('error', (e) => {
-                    console.error('Simli error:', e);
-                    root.textContent = 'Connection error: ' + (e.message || 'Unknown');
-                });
+        async function connectToRAG() {
+          try {
+            const res = await fetch("/api/rag/ws");
+            const { wsUrl } = await res.json();
 
-                client.on('speech', (data) => {
-                    console.log('User said:', data.text);
-                    if (useRag && ragWebSocket && ragWebSocket.readyState === WebSocket.OPEN) {
-                        ragWebSocket.send(JSON.stringify({ type: 'query', text: data.text }));
-                    }
-                });
+            ragWebSocket = new WebSocket(wsUrl);
 
-                await client.start(faceId, video);
+            ragWebSocket.onopen = () => {
+              console.log("Connected to RAG backend");
+            };
 
-                async function connectToRAG() {
-                    try {
-                        const res = await fetch('/api/rag/ws');
-                        const { wsUrl } = await res.json();
+            ragWebSocket.onmessage = (event) => {
+              const data = JSON.parse(event.data);
+              if (data.type === "response" && client) {
+                // Have avatar speak the RAG response
+                client.sendText(data.text);
+              }
+            };
 
-                        ragWebSocket = new WebSocket(wsUrl);
+            ragWebSocket.onerror = (err) => {
+              console.error("RAG error:", err);
+            };
+          } catch (err) {
+            console.error("Failed to connect to RAG:", err);
+          }
+        }
 
-                        ragWebSocket.onopen = () => console.log('Connected to RAG backend');
-
-                        ragWebSocket.onmessage = (event) => {
-                            const data = JSON.parse(event.data);
-                            if (data.type === 'response' && client) {
-                                client.sendText(data.text);
-                            }
-                        };
-
-                        ragWebSocket.onerror = (err) => console.error('RAG error:', err);
-                    } catch (err) {
-                        console.error('Failed to connect to RAG:', err);
-                    }
-                }
-
-            } catch (error) {
-                console.error('Init error:', error);
-                root.textContent = 'Error: ' + error.message;
-            }
-        })();
+      } catch (error) {
+        console.error("Init error:", error);
+        root.textContent = "Error: " + error.message;
+      }
     </script>
-</body>
+  </body>
 </html>
