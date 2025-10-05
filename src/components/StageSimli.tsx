@@ -11,7 +11,7 @@ export default function StageSimli({ faceId, agentId, scale = 0.82 }: Props) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [status, setStatus] = useState("Loading…");
   const [ready, setReady] = useState(false);
-  const [micEnabled, setMicEnabled] = useState(false);
+  const [connected, setConnected] = useState(false);
   const [client, setClient] = useState<any>(null);
   const mountedRef = useRef(false);
   const micStreamRef = useRef<MediaStream | null>(null);
@@ -43,8 +43,9 @@ export default function StageSimli({ faceId, agentId, scale = 0.82 }: Props) {
           faceID: faceId,         // cover both shapes
           faceId: faceId,
           videoRef: videoRef.current!,
-          audioRef: audioRef.current!,
-          handleSilence: true,
+          audioRef: audioRef.current!,   // Simli will attach REMOTE audio here
+          // When pushing our own mic track, set false to avoid artifacts
+          handleSilence: false,
           enableConsoleLogs: true,
         };
         if (agentId) cfg.agentId = agentId;
@@ -56,28 +57,26 @@ export default function StageSimli({ faceId, agentId, scale = 0.82 }: Props) {
         await init(cfg);
         if (cancelled) return;
 
+        // Wire speaking/silent events for auto half-duplex mic gating
+        c.on?.("speaking", () => {
+          console.log("Agent speaking - disabling mic");
+          // Agent is speaking -> avoid echo: temporarily disable mic track
+          const mic = micStreamRef.current;
+          mic?.getAudioTracks().forEach(t => (t.enabled = false));
+        });
+        c.on?.("silent", () => {
+          console.log("Agent silent - enabling mic");
+          // Agent stopped -> re-enable mic so user can talk
+          const mic = micStreamRef.current;
+          mic?.getAudioTracks().forEach(t => (t.enabled = true));
+        });
+
         c.on?.("connected", () => { console.log("Simli WebRTC connected"); });
-        c.on?.("error",     (e: any) => { console.error(e); setStatus("Simli error"); });
+        c.on?.("error", (e: any) => { console.error(e); setStatus("Simli error"); });
 
         setClient(c);
-
-        // Start Simli immediately to show the avatar (idle state)
-        setStatus("Starting avatar…");
-        const start = (c.start && c.start.bind(c)) || (c.connect && c.connect.bind(c));
-        if (start) {
-          try {
-            await start();
-            setReady(true);
-            setStatus("Ready. Click Connect.");
-          } catch (e: any) {
-            console.error("Auto-start failed:", e);
-            setReady(true);
-            setStatus("Ready. Click Connect.");
-          }
-        } else {
-          setReady(true);
-          setStatus("Ready. Click Connect.");
-        }
+        setReady(true);
+        setStatus("Ready");
       } catch (e: any) {
         if (!cancelled) setStatus("Init error: " + (e?.message ?? String(e)));
       }
@@ -95,51 +94,55 @@ export default function StageSimli({ faceId, agentId, scale = 0.82 }: Props) {
   async function onConnect() {
     if (!client) return;
 
-    setStatus("Requesting mic…");
     try {
-      // Get microphone access
+      // 1) Start WebRTC first (per Simli docs)
+      setStatus("Starting…");
+      const start = client.start?.bind(client) || client.connect?.bind(client);
+      if (!start) {
+        setStatus("No start/connect on client");
+        return;
+      }
+      await start();
+
+      // 2) Then request mic and send it ONLY to Simli (never to audioRef)
+      setStatus("Requesting mic…");
       const mic = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
-          autoGainControl: true,
+          autoGainControl: true
         }
       });
-
-      // Store for cleanup
       micStreamRef.current = mic;
 
-      // CRITICAL: Ensure audio element is NOT set to the mic stream (would cause feedback)
-      // Simli sets audioRef.srcObject to the agent's response stream - don't touch it
+      const track = mic.getAudioTracks()[0];
+      if (track) {
+        if (client.listenToMediastreamTrack) {
+          await client.listenToMediastreamTrack(track);
+        } else if (client.sendAudioTrack) {
+          await client.sendAudioTrack(track);
+        } else if (client.sendAudioStream) {
+          await client.sendAudioStream(mic);
+        } else {
+          console.warn("No mic ingestion method found on Simli client");
+        }
+      }
+
+      // 3) Make sure our output element is NOT the mic
       if (audioRef.current?.srcObject === mic) {
         audioRef.current.srcObject = null;
       }
-
-      // Ensure audio is unmuted for agent responses
       if (audioRef.current) {
         audioRef.current.muted = false;
       }
 
-      // Send mic audio to Simli for the agent to hear
-      // With agentId, Simli routes this to the agent backend for STT/conversation
-      const track = mic.getAudioTracks()[0];
-      if (track) {
-        if (client.sendAudioStream) {
-          await client.sendAudioStream(mic);
-        } else if (client.listenToMediastreamTrack) {
-          await client.listenToMediastreamTrack(track);
-        } else if (client.sendAudioTrack) {
-          await client.sendAudioTrack(track);
-        } else {
-          console.warn("No audio sending method found on client");
-        }
-      }
-
-      setMicEnabled(true);
-      setStatus("Listening…");
+      setConnected(true);
+      setStatus("Connected");
     } catch (e: any) {
       console.error(e);
-      setStatus("Mic blocked: " + (e?.message ?? String(e)));
+      setStatus((e?.name === "NotAllowedError")
+        ? "Mic blocked by browser"
+        : "Start failed: " + (e?.message ?? String(e)));
     }
   }
 
@@ -154,22 +157,22 @@ export default function StageSimli({ faceId, agentId, scale = 0.82 }: Props) {
           className="absolute inset-0 w-full h-full object-cover"
           style={{ transform: `scale(${scale})` }}
         />
-        {/* Audio element for Simli OUTPUT only (TTS/voice response) - never monitors mic input */}
+        {/* Plays ONLY the agent's remote audio that Simli attaches */}
         <audio ref={audioRef} autoPlay playsInline muted={false} />
         {/* tiny status overlay for debugging; remove later */}
         <div className="absolute inset-x-0 bottom-2 text-center text-[11px] text-white/75 pointer-events-none">
-          {micEnabled ? "" : status}
+          {connected ? "" : status}
         </div>
       </div>
 
       {/* Ring/frame */}
       <div className="absolute inset-0 rounded-full ring-2 ring-white/85 shadow-[0_40px_120px_rgba(0,0,0,0.15)] pointer-events-none" />
 
-      {!micEnabled && (
+      {!connected && (
         <button
           onClick={onConnect}
           disabled={!ready}
-          className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white text-black px-6 py-3 text-base font-medium shadow-lg hover:shadow-xl transition-shadow disabled:opacity-50"
+          className="absolute left-1/2 -translate-x-1/2 bottom-6 rounded-full bg-white text-black px-5 py-2.5 text-sm shadow"
         >
           {ready ? "Connect" : status}
         </button>
