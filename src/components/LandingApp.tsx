@@ -3,7 +3,8 @@ import SimliBackdrop from "./SimliBackdrop";
 import PunchOut from "./PunchOut";
 import StageFrame from "./StageFrame";
 import { Dock } from "./Dock";
-import { FogBackground } from "./FogBackground";
+import AnimatedBackground from "./AnimatedBackground";
+import GrainOverlay from "./GrainOverlay";
 import { AVATARS, type DockAvatar } from "../config/avatars";
 import { IS_SIMLI_LIVE } from "../config/env";
 
@@ -12,39 +13,40 @@ export default function LandingApp() {
   const url = active && IS_SIMLI_LIVE ? active.simliUrl : undefined;
 
   return (
-    <div className="relative min-h-screen">
-      {/* Layer 1: Simli behind everything */}
+    <div className="relative min-h-screen bg-[#0a0e14]">
+      {/* Layer 0: Animated background */}
+      <AnimatedBackground />
+
+      {/* Layer 1: Grain overlay */}
+      <GrainOverlay />
+
+      {/* Layer 2: Simli iframe (only when avatar selected) */}
       <SimliBackdrop url={url} />
 
-      {/* Layer 2: white overlay with circular hole */}
-      <PunchOut cx="50%" cy="40vh" r="min(29vmin, 320px)" />
+      {/* Layer 3: white overlay with circular hole (only blocks Simli, not background) */}
+      {url && <PunchOut cx="50%" cy="40vh" r="min(29vmin, 320px)" />}
 
-      {/* Layer 3: visual ring on top */}
+      {/* Layer 4: visual ring on top */}
       <StageFrame cx="50%" cy="40vh" d="min(58vmin, 640px)" />
-
-      {/* Layer 4: Fog background */}
-      <div className="relative z-20 pointer-events-none">
-        <FogBackground />
-      </div>
 
       {/* UI (on top) */}
       <div className="relative z-30 mx-auto max-w-6xl px-6 pt-8 pb-16">
         {/* header pill */}
-        <div className="flex items-center justify-between rounded-full bg-neutral-900/[.04] border border-neutral-900/10 px-4 py-3">
+        <div className="flex items-center justify-between rounded-full bg-white/[.18] border border-white/20 px-4 py-3 backdrop-blur-xl shadow-[0_8px_32px_rgba(0,0,0,.08)]">
           <div className="flex items-center gap-2">
             <div className="size-7 rounded-full bg-gradient-to-br from-pink-200 to-cyan-200" />
-            <span className="text-sm font-medium tracking-tight text-neutral-700">
+            <span className="text-sm font-medium tracking-tight text-neutral-800">
               Avatar Hub
             </span>
           </div>
-          <nav className="hidden sm:flex items-center gap-5 text-sm text-neutral-600">
-            <a href="#dock" className="hover:opacity-70">
+          <nav className="hidden sm:flex items-center gap-5 text-sm text-neutral-700">
+            <a href="#dock" className="hover:opacity-70 transition-opacity">
               Studio Tools
             </a>
-            <a href="/hub" className="hover:opacity-70">
+            <a href="/hub" className="hover:opacity-70 transition-opacity">
               Projection Hub
             </a>
-            <a href="/about" className="hover:opacity-70">
+            <a href="/about" className="hover:opacity-70 transition-opacity">
               About
             </a>
           </nav>

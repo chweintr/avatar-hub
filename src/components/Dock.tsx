@@ -28,21 +28,23 @@ function DockChip({
       data-testid={`dock-avatar-${item.id}`}
     >
       <motion.div
-        initial={{ y: 0, scale: 1, boxShadow: "0 0 0 rgba(0,0,0,0)" }}
+        initial={{ y: 0, scale: 1 }}
         whileHover={{
-          y: -4,
-          scale: isActive ? 1 : 1.03,
-          boxShadow: "0 10px 30px rgba(0,0,0,0.10)",
+          y: -8,
+          scale: isActive ? 1 : 1.05,
         }}
-        transition={{ type: "spring", stiffness: 320, damping: 22 }}
-        className="relative aspect-square w-28 rounded-full overflow-hidden bg-neutral-100"
+        transition={{ type: "spring", stiffness: 300, damping: 20 }}
+        className="relative aspect-square w-28 rounded-full overflow-hidden"
         style={{ background: bg }}
       >
+        {/* Glassmorphic pill background */}
+        <div className="absolute inset-0 bg-white/[.18] backdrop-blur-xl border border-white/20 rounded-full shadow-[0_8px_32px_rgba(0,0,0,.08)]" />
+
         {isActive ? (
-          <div className="h-full w-full grid place-items-center bg-neutral-200">
+          <div className="relative h-full w-full grid place-items-center">
             <svg
               viewBox="0 0 24 24"
-              className="w-10 h-10 text-neutral-400"
+              className="w-10 h-10 text-neutral-700"
               fill="currentColor"
               aria-hidden
             >
@@ -53,13 +55,13 @@ function DockChip({
           <img
             src={item.thumbnail}
             alt={item.name}
-            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.05]"
+            className="relative h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.08]"
           />
         ) : null}
 
-        {/* inner ring + outer glow on hover */}
-        <div className="pointer-events-none absolute inset-0 rounded-full ring-1 ring-white/60 mix-blend-overlay" />
-        <div className="pointer-events-none absolute inset-0 rounded-full ring-2 ring-transparent group-hover:ring-black/10" />
+        {/* Enhanced ring glow on hover */}
+        <div className="pointer-events-none absolute inset-0 rounded-full ring-[1.5px] ring-white/40 mix-blend-overlay transition-all duration-300 group-hover:ring-white/60" />
+        <div className="pointer-events-none absolute inset-0 rounded-full shadow-[0_0_0_0_rgba(255,255,255,0)] transition-all duration-300 group-hover:shadow-[0_0_20px_4px_rgba(255,255,255,0.3)]" />
       </motion.div>
 
       {/* Label under chip */}

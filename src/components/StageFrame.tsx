@@ -22,16 +22,22 @@ export default function StageFrame({
 
   return (
     <div style={style} aria-hidden>
-      {/* Main ring */}
+      {/* Main ring with layered shadows */}
       <div
-        className="absolute rounded-full ring-1 ring-white/70"
+        className="absolute rounded-full"
         style={{
           width: d,
           height: d,
           left: `calc(${cx} - (${d}/2))`,
           top: `calc(${cy} - (${d}/2))`,
-          boxShadow: "0 20px 80px rgba(0,0,0,0.12)",
-          background: "transparent",
+          border: "8px solid rgba(255, 255, 255, 1)",
+          boxShadow:
+            "0 0 0 2px rgba(255,255,255,.35) inset, 0 40px 120px rgba(10,14,20,.15), 0 0 0px rgba(255,255,255, 0)",
+          background:
+            "radial-gradient(circle at 50% 40%, rgba(255,255,255,.08), rgba(255,255,255,0) 55%)",
+          // CSS variables for potential animation
+          ["--rg-spread" as string]: "0px",
+          ["--rg-alpha" as string]: "0",
         }}
       />
       {/* Subtle inner halo */}

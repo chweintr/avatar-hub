@@ -11,7 +11,7 @@ export default function PunchOut({
   cy?: string;
   r?: string;
 }) {
-  const mask = `radial-gradient(circle at ${cx} ${cy}, transparent ${r}, black calc(${r} + 1px))`;
+  const mask = `radial-gradient(circle at ${cx} ${cy}, transparent ${r}, white calc(${r} + 1px))`;
   const style: React.CSSProperties = {
     WebkitMaskImage: mask,
     maskImage: mask,
