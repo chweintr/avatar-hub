@@ -1,144 +1,112 @@
 <!doctype html>
 <html>
-  <head>
-    <meta charset="utf-8"/>
-    <meta name="viewport" content="width=device-width,initial-scale=1"/>
-    <title>Simli Agent</title>
-    <style>
-      :root { --simli-scale: 0.80; --circle-d: min(58vmin, 640px); --circle-cy: 40vh; }
-      html,body{height:100%;margin:0;background:#000}
-      #video{
-        position:fixed;left:0;top:0;
-        width:100%;height:100%;object-fit:cover;background:#000;
-        outline: 2px solid rgba(0,255,0,.5);
-      }
-      #audio{display:none}
-      #status{
-        position:fixed;top:35%;left:50%;transform:translateX(-50%);
-        width:70%;
-        color:#fff;font:600 14px/1.4 system-ui;text-align:center;pointer-events:none;
-        background:rgba(0,0,0,0.8);padding:12px 16px;border-radius:12px
-      }
-      #startBtn{
-        position:fixed;left:50%;top:60%;
-        transform:translateX(-50%);
-        width:120px;height:40px;border-radius:9999px;border:0;background:#fff;color:#000;
-        font:600 13px/40px system-ui;cursor:pointer;box-shadow:0 8px 24px rgba(0,0,0,.4);
-        z-index:100
-      }
-      #selfTest{
-        display:none
-      }
-    </style>
-  </head>
-  <body>
-    <div id="status">Booting…</div>
-    <video id="video" autoplay playsinline></video>
-    <audio id="audio" autoplay></audio>
-    <button id="startBtn">Connect</button>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Simli Agent</title>
+  <style>
+    :root { --simli-scale: 0.80; --circle-d: min(58vmin, 640px); --circle-cy: 40vh; }
+    html,body{height:100%;margin:0;background:#000}
+    #video{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%) scale(var(--simli-scale));
+           width:100vw;height:100vh;object-fit:cover;background:#000;outline:2px solid rgba(255,0,0,.15)}
+    #audio{display:none}
+    #status{position:fixed;inset:0;display:grid;place-items:center;color:#fff;font:14px system-ui;
+            text-align:center;pointer-events:none;z-index:1000}
+    #startBtn{position:fixed;left:calc(50% - 70px);top:calc(var(--circle-cy) + (var(--circle-d)/2) - 60px);
+              width:140px;height:44px;border-radius:9999px;border:0;background:#fff;color:#000;
+              font:14px/44px system-ui;cursor:pointer;box-shadow:0 10px 30px rgba(0,0,0,.18);z-index:1001}
+    #selfTest{position:fixed;left:16px;bottom:16px;padding:8px 12px;border-radius:9999px;border:0;
+              background:#222;color:#fff;font:12px;opacity:.9;z-index:1001}
+  </style>
+</head>
+<body>
+  <div id="status">Booting…</div>
+  <video id="video" autoplay playsinline></video>
+  <audio id="audio" autoplay></audio>
+  <button id="startBtn">Connect</button>
+  <button id="selfTest" title="Bypass SDK; show webcam directly">Self-test camera</button>
 
-    <script type="module">
-      const status  = document.getElementById("status");
-      const startBtn= document.getElementById("startBtn");
-      const video   = document.getElementById("video");
-      const audio   = document.getElementById("audio");
-      const log = (msg) => { console.log("[simli]", msg); status.textContent = msg; };
+  <script type="module">
+    const status = document.getElementById('status');
+    const startBtn = document.getElementById('startBtn');
+    const selfBtn = document.getElementById('selfTest');
+    const video = document.getElementById('video');
+    const audio = document.getElementById('audio');
+    const say = (m) => { console.log('[simli]', m); status.textContent = m; };
 
-      const qp = new URLSearchParams(location.search);
-      const faceID  = (qp.get("faceId") || "").trim();
-      const agentId = (qp.get("agentId") || "").trim();
-      const scaleQP = parseFloat(qp.get("scale") || "");
-      if (!Number.isNaN(scaleQP)) document.documentElement.style.setProperty("--simli-scale", String(scaleQP));
+    // Params
+    const qp = new URLSearchParams(location.search);
+    const faceID = (qp.get('faceId') || '').trim();
+    const agentId = (qp.get('agentId') || '').trim();
+    const s = parseFloat(qp.get('scale') || ''); if (!Number.isNaN(s)) document.documentElement.style.setProperty('--simli-scale', String(s));
+    if (!faceID) { status.textContent = 'Missing faceId'; throw new Error('no faceId'); }
 
+    // Self-test proves permissions & click path
+    selfBtn.onclick = async () => {
       try {
-        if (!faceID) throw new Error("Missing faceId");
+        say('Self-test: requesting camera…');
+        const stream = await navigator.mediaDevices.getUserMedia({ video:true, audio:true });
+        video.srcObject = stream;
+        say('Self-test running (camera feed).');
+      } catch (e) { say('Self-test failed: ' + (e?.message || e)); }
+    };
 
-        log("Fetching API key…");
-        const r = await fetch("/api/simli-config", { cache: "no-store" });
-        if (!r.ok) throw new Error("Failed to get API key");
-        const { apiKey } = await r.json();
-        if (!apiKey) throw new Error("Empty API key");
+    // Step 1: get key
+    say('Fetching API key…');
+    const r = await fetch('/api/simli-config', { cache:'no-store' });
+    if (!r.ok) throw new Error('Failed to get API key'); const { apiKey } = await r.json();
+    if (!apiKey) throw new Error('Empty API key');
 
-        log("Loading SDK…");
-        async function loadSDK() {
-          const urls = [
-            "https://cdn.jsdelivr.net/npm/simli-client@latest/+esm",
-            "https://esm.sh/simli-client@latest",
-            "https://unpkg.com/simli-client@latest/dist/index.js?module"
-          ];
-          let lastErr;
-          for (const u of urls) {
-            try { return await import(u); } catch (e) { console.warn("import fail", u, e); lastErr = e; }
-          }
-          throw lastErr || new Error("No SDK");
-        }
-        const mod = await loadSDK();
-        const SimliClient = mod?.SimliClient || mod?.default || (window).SimliClient;
-        if (!SimliClient) throw new Error("SDK export not found");
+    // Step 2: load SDK (robust import)
+    say('Loading SDK…');
+    async function loadSDK() {
+      const urls = [
+        'https://cdn.jsdelivr.net/npm/simli-client@latest/+esm',
+        'https://esm.sh/simli-client@latest',
+        'https://unpkg.com/simli-client@latest/dist/index.js?module'
+      ];
+      let last; for (const u of urls) { try { return await import(u); } catch (e) { console.warn('import fail', u, e); last = e; } }
+      throw last || new Error('No SDK');
+    }
+    const mod = await loadSDK();
+    const SimliClient = mod?.SimliClient || mod?.default || window.SimliClient;
+    if (!SimliClient) throw new Error('SDK export not found');
 
-        log("Creating client…");
-        const client = new SimliClient();
+    // Step 3: init (cover both shapes)
+    say('Creating client…');
+    const client = new SimliClient();
+    const initCfg = { apiKey, faceID, faceId: faceID, videoRef: video, audioRef: audio, handleSilence:true, enableConsoleLogs:true };
+    if (agentId) initCfg.agentId = agentId;
+    const init = client.Initialize?.bind(client) || client.initialize?.bind(client);
+    if (!init) throw new Error('No Initialize/initialize on client');
 
-        const initCfg = {
-          apiKey,
-          faceID, faceId: faceID,
-          videoRef: video,
-          audioRef: audio,
-          handleSilence: true,
-          enableConsoleLogs: true,
-        };
-        if (agentId) initCfg.agentId = agentId;
+    say('Initializing…');
+    await init(initCfg);
+    say('Ready. Click Connect.');
 
-        const initFn = (typeof client.Initialize === "function")
-          ? client.Initialize.bind(client)
-          : (typeof client.initialize === "function")
-            ? client.initialize.bind(client)
-            : null;
-        if (!initFn) throw new Error("No Initialize/initialize on client");
+    // Step 4: user gesture inside iframe
+    startBtn.onclick = async () => {
+      try {
+        say('Starting…');
+        const start = client.start?.bind(client) || client.connect?.bind(client);
+        if (!start) throw new Error('No start/connect on client');
+        await start();
+        startBtn.style.display = 'none';
+        say('Connected.');
+      } catch (e) { console.error(e); say('Start failed: ' + (e?.message || e)); }
+    };
 
-        log("Initializing…");
-        await initFn(initCfg);
+    client.on?.('connected', () => say('Connected (event).'));
+    client.on?.('failed',    () => say('Simli failed'));
+    client.on?.('error',  e  => { console.error(e); say('Simli error: ' + (e?.message || e)); });
 
-        log("Ready. Click Connect.");
-
-        startBtn.onclick = async (e) => {
-          e.preventDefault();
-          startBtn.disabled = true;
-          try {
-            log("Starting…");
-            const startFn = (typeof client.start === "function")
-              ? client.start.bind(client)
-              : (typeof client.connect === "function")
-                ? client.connect.bind(client)
-                : null;
-            if (!startFn) throw new Error("No start/connect method on client");
-
-            await startFn();
-            startBtn.style.display = "none";
-            log("Connected.");
-          } catch (e) {
-            console.error(e);
-            startBtn.disabled = false;
-            status.textContent = "Start failed: " + (e?.message || e);
-          }
-        };
-
-        client.on?.("connected", () => { log("Connected (event)."); });
-        client.on?.("failed",    () => { status.textContent = "Simli failed"; });
-        client.on?.("error",  e  => { console.error(e); status.textContent = "Simli error"; });
-
-        window.addEventListener("message", (e) => {
-          if (e.origin !== location.origin) return;
-          if (e.data?.type === "SIMLI_SET_SCALE") {
-            const v = Number(e.data?.payload);
-            if (!Number.isNaN(v)) document.documentElement.style.setProperty("--simli-scale", String(v));
-          }
-        });
-
-      } catch (e) {
-        console.error(e);
-        status.textContent = "Init error: " + (e?.message || e);
+    // Allow parent to nudge zoom
+    window.addEventListener('message', (e) => {
+      if (e.origin !== location.origin) return;
+      if (e.data?.type === 'SIMLI_SET_SCALE') {
+        const v = Number(e.data?.payload); if (!Number.isNaN(v)) document.documentElement.style.setProperty('--simli-scale', String(v));
       }
-    </script>
-  </body>
+    });
+  </script>
+</body>
 </html>
