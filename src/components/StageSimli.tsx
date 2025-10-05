@@ -71,12 +71,17 @@ export default function StageSimli({ faceId, agentId, scale = 0.82 }: Props) {
           mic?.getAudioTracks().forEach(t => (t.enabled = true));
         });
 
-        c.on?.("connected", () => { console.log("Simli WebRTC connected"); });
-        c.on?.("error", (e: any) => { console.error(e); setStatus("Simli error"); });
+        c.on?.("connected", () => {
+          console.log("Simli WebRTC connected");
+        });
+        c.on?.("error", (e: any) => {
+          console.error(e);
+          setStatus("Simli error");
+        });
 
         setClient(c);
         setReady(true);
-        setStatus("Ready");
+        setStatus("Ready - Click to connect");
       } catch (e: any) {
         if (!cancelled) setStatus("Init error: " + (e?.message ?? String(e)));
       }
@@ -95,16 +100,7 @@ export default function StageSimli({ faceId, agentId, scale = 0.82 }: Props) {
     if (!client) return;
 
     try {
-      // 1) Start WebRTC first (per Simli docs)
-      setStatus("Starting…");
-      const start = client.start?.bind(client) || client.connect?.bind(client);
-      if (!start) {
-        setStatus("No start/connect on client");
-        return;
-      }
-      await start();
-
-      // 2) Then request mic and send it ONLY to Simli (never to audioRef)
+      // Request mic access
       setStatus("Requesting mic…");
       const mic = await navigator.mediaDevices.getUserMedia({
         audio: {
@@ -115,34 +111,27 @@ export default function StageSimli({ faceId, agentId, scale = 0.82 }: Props) {
       });
       micStreamRef.current = mic;
 
-      const track = mic.getAudioTracks()[0];
-      if (track) {
-        if (client.listenToMediastreamTrack) {
-          await client.listenToMediastreamTrack(track);
-        } else if (client.sendAudioTrack) {
-          await client.sendAudioTrack(track);
-        } else if (client.sendAudioStream) {
-          await client.sendAudioStream(mic);
-        } else {
-          console.warn("No mic ingestion method found on Simli client");
-        }
-      }
-
-      // 3) Make sure our output element is NOT the mic
-      if (audioRef.current?.srcObject === mic) {
-        audioRef.current.srcObject = null;
-      }
+      // CRITICAL: Ensure audioRef never gets the mic stream
       if (audioRef.current) {
+        audioRef.current.srcObject = null;
         audioRef.current.muted = false;
       }
 
-      setConnected(true);
-      setStatus("Connected");
+      // Send ONLY the mic track to Simli (not the full stream)
+      const track = mic.getAudioTracks()[0];
+      if (track && client.listenToMediastreamTrack) {
+        setStatus("Connecting…");
+        await client.listenToMediastreamTrack(track);
+        setConnected(true);
+        setStatus("Connected");
+      } else {
+        setStatus("No audio method available");
+      }
     } catch (e: any) {
       console.error(e);
       setStatus((e?.name === "NotAllowedError")
         ? "Mic blocked by browser"
-        : "Start failed: " + (e?.message ?? String(e)));
+        : "Error: " + (e?.message ?? String(e)));
     }
   }
 
