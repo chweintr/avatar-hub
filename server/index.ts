@@ -39,6 +39,8 @@ app.get('/health', (req, res) => {
 // Simple endpoint to get Simli API key (server-side only)
 app.get('/api/simli-config', (req, res) => {
   const apiKey = process.env.SIMLI_API_KEY || process.env.VITE_SIMLI_API_KEY;
+  const faceId = process.env.SIMLI_FACE_ID;
+  const agentId = process.env.SIMLI_AGENT_ID;
 
   if (!apiKey) {
     return res.status(500).json({
@@ -46,7 +48,13 @@ app.get('/api/simli-config', (req, res) => {
     });
   }
 
-  res.json({ apiKey });
+  if (!faceId) {
+    return res.status(500).json({
+      error: 'Simli face ID not configured on server'
+    });
+  }
+
+  res.json({ apiKey, faceId, agentId });
 });
 
 // LiveKit token endpoint

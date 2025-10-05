@@ -1,12 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 
 type Props = {
-  faceId: string;
-  agentId?: string;
   scale?: number; // 0.76–0.86 usually
 };
 
-export default function StageSimli({ faceId, agentId, scale = 0.82 }: Props) {
+export default function StageSimli({ scale = 0.82 }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const [status, setStatus] = useState("Loading…");
@@ -23,10 +21,12 @@ export default function StageSimli({ faceId, agentId, scale = 0.82 }: Props) {
 
     (async () => {
       try {
-        setStatus("Fetching API key…");
+        setStatus("Fetching config…");
         const r = await fetch("/api/simli-config", { cache: "no-store" });
         if (!r.ok) throw new Error("HTTP " + r.status);
-        const { apiKey } = await r.json();
+        const { apiKey, faceId, agentId } = await r.json();
+
+        if (!faceId) throw new Error("No faceId from server");
 
         setStatus("Loading SDK…");
         const mod = await import("https://cdn.jsdelivr.net/npm/simli-client@1.2.15/+esm");
@@ -98,7 +98,7 @@ export default function StageSimli({ faceId, agentId, scale = 0.82 }: Props) {
         }
       }
     };
-  }, [faceId, agentId]);
+  }, []);
 
   async function onConnect() {
     if (!client) return;

@@ -27,12 +27,8 @@ export default function AppLanding() {
         {/* Stage area */}
         <section className="mt-10 flex justify-center">
           {active ? (
-            active.faceId ? (
-              <StageSimli
-                faceId={active.faceId}
-                agentId={active.agentId}
-                scale={active.scale}
-              />
+            active.useSimli ? (
+              <StageSimli scale={active.scale} />
             ) : (
               <StageLiveKit roomName={active.room} />
             )
