@@ -66,10 +66,37 @@ export default function StageSimli({ faceId, agentId, scale = 0.82 }: Props) {
 
   async function onConnect() {
     if (!client) return;
+    // 1) Explicit mic permission (inside user gesture)
+    setStatus("Requesting mic…");
+    let mic: MediaStream | undefined;
+    try {
+      mic = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const track = mic.getAudioTracks()[0];
+      // 2) Give Simli the audio source (supported by the official client)
+      if (client.listenToMediastreamTrack && track) {
+        client.listenToMediastreamTrack(track);
+      }
+    } catch (e: any) {
+      console.error(e);
+      setStatus("Mic blocked: " + (e?.message ?? String(e)));
+      return;
+    }
+
+    // 3) Start the WebRTC session
     setStatus("Starting…");
-    const start = client.start?.bind(client) || client.connect?.bind(client);
+    const start =
+      (client.start && client.start.bind(client)) ||
+      (client.connect && client.connect.bind(client));
     if (!start) { setStatus("No start/connect on client"); return; }
-    try { await start(); } catch (e: any) { setStatus("Start failed: " + (e?.message ?? String(e))); }
+    try {
+      await start();
+      setStatus("Connected");
+    } catch (e: any) {
+      console.error(e);
+      setStatus("Start failed: " + (e?.message ?? String(e)));
+      // Optional: stop mic if start failed
+      try { mic?.getTracks().forEach(t => t.stop()); } catch {}
+    }
   }
 
   return (
@@ -84,6 +111,10 @@ export default function StageSimli({ faceId, agentId, scale = 0.82 }: Props) {
           style={{ transform: `scale(${scale})` }}
         />
         <audio ref={audioRef} autoPlay />
+        {/* tiny status overlay for debugging; remove later */}
+        <div className="absolute inset-x-0 bottom-2 text-center text-[11px] text-white/75 pointer-events-none">
+          {connected ? "" : status}
+        </div>
       </div>
 
       {/* Ring/frame */}

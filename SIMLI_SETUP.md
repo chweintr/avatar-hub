@@ -1,5 +1,14 @@
 # Simli Avatar Setup
 
+## **IMPORTANT: Environment Variables Policy**
+
+**DO NOT store API keys or secrets in local `.env` files.**
+
+- All API keys and secrets live **ONLY in Railway variables**
+- The Express server (`/api/simli-config`) serves the API key to the client at runtime
+- Local `.env` files should remain empty or contain only non-sensitive config
+- This keeps credentials out of git and your local filesystem
+
 ## Railway Setup (Production)
 
 ### 1. Configure API Key in Railway
@@ -15,77 +24,37 @@ Get your API key from [Simli Dashboard → API Keys](https://app.simli.ai/settin
 
 Visit your deployed avatars at:
 ```
-https://your-railway-domain.up.railway.app/simli-agent.html?agentId=YOUR_AGENT&faceId=YOUR_FACE
+https://your-railway-domain.up.railway.app/
 ```
 
 ## Local Development Setup
 
-### 1. Configure API Key (Optional)
+### No Local API Key Required
 
-For local testing with live Simli integration:
-
-```bash
-cp .env.example .env
-```
-
-Edit `.env` and set:
-```
-VITE_SIMLI_API_KEY=your_actual_simli_api_key
-```
-
-### 2. Development Modes
-
-**Default (Recommended):**
-- `IS_SIMLI_LIVE = false` in `src/config/env.ts`
-- Shows gradient placeholders
-- No iframe loading, no API calls, no 500 errors
-- Perfect for UI development and screenshots
-
-**Live Testing:**
-- Edit `src/config/env.ts`: set `IS_SIMLI_LIVE = true`
-- Requires `.env` file with `VITE_SIMLI_API_KEY`
-- Loads real Simli iframes in development
+The app fetches the Simli API key from `/api/simli-config` at runtime, which pulls from Railway environment variables even in local development (when connected to Railway's service).
 
 ## Architecture
 
-### Bundled Iframe Pages
+### In-Page Simli Client
 
-The Simli integration uses **Vite-bundled HTML pages**:
+The Simli integration uses an **in-page component** (not iframe):
 
 **Files:**
-- `simli-agent.html` → Standard Simli agent
-- `simli-rag-agent.html` → RAG-powered agent (for Grants Expert)
-- `src/iframe/simliAgent.ts` → Bundled TypeScript entry
-- `src/iframe/simliRagAgent.ts` → RAG-enabled entry
+- `src/components/StageSimli.tsx` → Main Simli client component
+- Renders directly in the page with proper user gesture handling
+- Fetches API key from `/api/simli-config` at runtime
+- No iframe = no cross-origin or permission issues
 
-**Build Configuration:**
-```typescript
-// vite.config.ts
-rollupOptions: {
-  input: {
-    main: resolve(__dirname, 'index.html'),
-    simliAgent: resolve(__dirname, 'simli-agent.html'),
-    simliRagAgent: resolve(__dirname, 'simli-rag-agent.html'),
-  },
-}
-```
-
-### Self-Contained Design
-
-**No backend API required:**
-- API key: `import.meta.env.VITE_SIMLI_API_KEY` (baked in at build time)
-- Configuration: URL query parameters (`faceId`, `agentId`)
-- No `/api/avatar/config` endpoint needed
-
-### Avatar URLs
-
-Configured in `src/config/avatars.ts`:
+**Configuration:**
+Avatars configured in `src/config/avatars.ts`:
 
 ```typescript
 {
   id: "tax",
   name: "Tax Advisor for Artists",
-  simliUrl: `/simli-agent.html?id=tax&faceId=afdb6a3e-3939-40aa-92df-01604c23101c&agentId=d951e6dc-c098-43fb-a34f-e970cd339ea6`
+  faceId: "afdb6a3e-3939-40aa-92df-01604c23101c",
+  agentId: "d951e6dc-c098-43fb-a34f-e970cd339ea6",
+  scale: 0.82
 }
 ```
 
@@ -93,19 +62,19 @@ Configured in `src/config/avatars.ts`:
 
 ### "Missing Simli API key" Error
 
-**In Production (Railway):**
+**In Railway:**
 1. Check Railway Variables has `VITE_SIMLI_API_KEY`
 2. Redeploy after adding the variable
-3. Vite bakes the value into the bundle at build time
+3. The Express server at `/api/simli-config` will serve it to the client
 
-**In Development:**
-1. Create `.env` file: `cp .env.example .env`
-2. Add `VITE_SIMLI_API_KEY=your_key`
-3. Restart dev server: `npm run dev`
+**Remember:** Do NOT add the key to local `.env` files. Keys live only in Railway.
 
-### 500 Errors in Development
+### Connect Button Does Nothing
 
-Set `IS_SIMLI_LIVE = false` in `src/config/env.ts` to show placeholders.
+If clicking Connect shows no mic prompt:
+1. Check browser console for errors
+2. Look at the status text at bottom of circle (shows exact step/error)
+3. Ensure HTTPS or localhost (browsers block device access on insecure origins)
 
 ### Browser Extension Blocking
 
