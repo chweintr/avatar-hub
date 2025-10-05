@@ -58,17 +58,8 @@ export default function StageSimli({ faceId, agentId, scale = 0.82 }: Props) {
         if (cancelled) return;
 
         // Avatar events
-        c.on?.("connected", async () => {
+        c.on?.("connected", () => {
           console.log("Simli WebRTC connected");
-
-          // Now that we're connected, send the mic if we have it
-          if (micStreamRef.current) {
-            const track = micStreamRef.current.getAudioTracks()[0];
-            if (track && c.listenToMediastreamTrack) {
-              await c.listenToMediastreamTrack(track);
-              console.log("Mic track sent to Simli");
-            }
-          }
         });
 
         c.on?.("error", (e: any) => {
@@ -77,7 +68,11 @@ export default function StageSimli({ faceId, agentId, scale = 0.82 }: Props) {
         });
 
         c.on?.("speaking", () => {
-          console.log("Avatar speaking");
+          if (audioRef.current) audioRef.current.muted = false;
+          if (unmuteTimer.current) {
+            window.clearTimeout(unmuteTimer.current);
+            unmuteTimer.current = null;
+          }
         });
 
         setClient(c);
@@ -101,20 +96,26 @@ export default function StageSimli({ faceId, agentId, scale = 0.82 }: Props) {
     if (!client) return;
 
     try {
-      // 1) Get mic first (need user gesture)
+      // 1) Mic FIRST (user gesture), do not monitor locally
       setStatus("Requesting mic…");
       const mic = await navigator.mediaDevices.getUserMedia({
         audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
       });
       micStreamRef.current = mic;
+      const track = mic.getAudioTracks()[0];
 
-      // CRITICAL: Never route mic to audio element
-      if (audioRef.current?.srcObject === mic) {
-        audioRef.current.srcObject = null;
+      // hard guard: NEVER route mic to local output
+      if (audioRef.current?.srcObject === mic) audioRef.current.srcObject = null;
+      if (videoRef.current?.srcObject === mic) videoRef.current.srcObject = null;
+
+      // 2) Give Simli the mic track (one way → Simli)
+      if (track && client.listenToMediastreamTrack) {
+        await client.listenToMediastreamTrack(track);
+      } else if (track && client.sendAudioTrack) {
+        await client.sendAudioTrack(track);
       }
 
-      // 2) Start session - this will trigger 'connected' event
-      // The 'connected' handler will then send the mic track
+      // 3) Start the WebRTC session (docs: Step 4)
       setStatus("Connecting…");
       const start = client.start?.bind(client) || client.connect?.bind(client);
       if (!start) {
@@ -122,6 +123,16 @@ export default function StageSimli({ faceId, agentId, scale = 0.82 }: Props) {
         return;
       }
       await start();
+
+      // 4) Mute output until avatar actually speaks (avoid any loopback artifact)
+      if (audioRef.current) {
+        audioRef.current.muted = true;
+        if (unmuteTimer.current) window.clearTimeout(unmuteTimer.current);
+        unmuteTimer.current = window.setTimeout(() => {
+          if (audioRef.current) audioRef.current.muted = false;
+          unmuteTimer.current = null;
+        }, 1200); // fail-safe if 'speaking' event never fires
+      }
 
       setConnected(true);
       setStatus("Connected");
@@ -145,7 +156,7 @@ export default function StageSimli({ faceId, agentId, scale = 0.82 }: Props) {
           className="absolute inset-0 w-full h-full object-cover"
           style={{ transform: `scale(${scale})` }}
         />
-        <audio ref={audioRef} autoPlay playsInline muted />
+        <audio ref={audioRef} autoPlay playsInline />
         {/* tiny status overlay for debugging; remove later */}
         <div className="absolute inset-x-0 bottom-2 text-center text-[11px] text-white/75 pointer-events-none">
           {connected ? "" : status}
