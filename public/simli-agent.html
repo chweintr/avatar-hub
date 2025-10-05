@@ -50,8 +50,6 @@
       const scaleQP = parseFloat(qp.get("scale") || "");
       if (!Number.isNaN(scaleQP)) document.documentElement.style.setProperty("--simli-scale", String(scaleQP));
 
-      startBtn.addEventListener("click", () => console.log("[simli] connect clicked"));
-
       try {
         if (!faceID) throw new Error("Missing faceId");
 
@@ -100,9 +98,12 @@
 
         log("Initializing…");
         await initFn(initCfg);
-        status.textContent = "Ready. Click Connect.";
 
-        startBtn.onclick = async () => {
+        log("Ready. Click Connect.");
+
+        startBtn.onclick = async (e) => {
+          e.preventDefault();
+          startBtn.disabled = true;
           try {
             log("Starting…");
             const startFn = (typeof client.start === "function")
@@ -111,11 +112,13 @@
                 ? client.connect.bind(client)
                 : null;
             if (!startFn) throw new Error("No start/connect method on client");
+
             await startFn();
             startBtn.style.display = "none";
             log("Connected.");
           } catch (e) {
             console.error(e);
+            startBtn.disabled = false;
             status.textContent = "Start failed: " + (e?.message || e);
           }
         };
