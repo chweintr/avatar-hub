@@ -95,35 +95,46 @@ export default function StageSimli({ faceId, agentId, scale = 0.82 }: Props) {
   async function onConnect() {
     if (!client) return;
 
-    // When using agentId, we need to explicitly enable bidirectional audio
-    setStatus("Starting conversation…");
+    setStatus("Requesting mic…");
     try {
-      // Start audio streaming with the agent
-      if (client.StartAudioToAudioSession) {
-        await client.StartAudioToAudioSession();
-        setMicEnabled(true);
-        setStatus("Connected");
-      } else if (client.startAudioToAudioSession) {
-        await client.startAudioToAudioSession();
-        setMicEnabled(true);
-        setStatus("Connected");
-      } else {
-        console.warn("No StartAudioToAudioSession method found - using fallback mic approach");
-        // Fallback: just request permission (agent backend may auto-connect)
-        const mic = await navigator.mediaDevices.getUserMedia({
-          audio: {
-            echoCancellation: true,
-            noiseSuppression: true,
-            autoGainControl: true,
-          }
-        });
-        micStreamRef.current = mic;
-        setMicEnabled(true);
-        setStatus("Connected");
+      // Get microphone access
+      const mic = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        }
+      });
+
+      // Store for cleanup
+      micStreamRef.current = mic;
+
+      // CRITICAL: Don't let the audio element play back the mic (causes feedback)
+      if (audioRef.current) {
+        audioRef.current.srcObject = null;
+        audioRef.current.muted = false; // Unmute for agent response audio
       }
+
+      // Send mic audio to Simli for the agent to hear
+      // With agentId, Simli routes this to the agent backend for STT/conversation
+      const track = mic.getAudioTracks()[0];
+      if (track) {
+        if (client.sendAudioStream) {
+          await client.sendAudioStream(mic);
+        } else if (client.listenToMediastreamTrack) {
+          await client.listenToMediastreamTrack(track);
+        } else if (client.sendAudioTrack) {
+          await client.sendAudioTrack(track);
+        } else {
+          console.warn("No audio sending method found on client");
+        }
+      }
+
+      setMicEnabled(true);
+      setStatus("Listening…");
     } catch (e: any) {
       console.error(e);
-      setStatus("Connection failed: " + (e?.message ?? String(e)));
+      setStatus("Mic blocked: " + (e?.message ?? String(e)));
     }
   }
 
