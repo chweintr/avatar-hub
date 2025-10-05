@@ -101,7 +101,7 @@ export default function StageSimli({ faceId, agentId, scale = 0.82 }: Props) {
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
-          autoGainControl: false,
+          autoGainControl: true,
         }
       });
 
@@ -115,13 +115,30 @@ export default function StageSimli({ faceId, agentId, scale = 0.82 }: Props) {
         audioRef.current.srcObject = null;
       }
 
+      // Explicitly mute the audio element temporarily to prevent any initial feedback
+      if (audioRef.current) {
+        audioRef.current.muted = true;
+      }
+
       // Give Simli the audio source for voice interaction
       if (client.listenToMediastreamTrack && track) {
-        client.listenToMediastreamTrack(track);
+        await client.listenToMediastreamTrack(track);
       }
 
       setMicEnabled(true);
       setStatus("Listening…");
+
+      // Trigger the agent to say the intro greeting
+      // Wait a moment for connection to stabilize, then unmute and send greeting
+      setTimeout(async () => {
+        if (audioRef.current) {
+          audioRef.current.muted = false;
+        }
+        // Send intro message to trigger agent greeting
+        if (client.sendText) {
+          await client.sendText("Hello");
+        }
+      }, 500);
     } catch (e: any) {
       console.error(e);
       setStatus("Mic blocked: " + (e?.message ?? String(e)));
