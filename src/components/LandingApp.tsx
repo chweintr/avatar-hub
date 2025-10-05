@@ -61,8 +61,8 @@ export default function LandingApp() {
       {/* Layer 4: visual ring on top */}
       <StageFrame cx="50%" cy="40vh" d="min(58vmin, 640px)" />
 
-      {/* Layer 5: connect overlay */}
-      {url && (
+      {/* Layer 5: connect overlay - disabled, using in-iframe button for proper user gesture */}
+      {/* {url && (
         <ConnectOverlay
           iframeRef={iframeRef}
           visible={showConnectOverlay}
@@ -72,7 +72,7 @@ export default function LandingApp() {
           cy="40vh"
           d="min(58vmin, 640px)"
         />
-      )}
+      )} */}
 
       {/* Nav bar */}
       <NavBar />
