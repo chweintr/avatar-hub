@@ -15,18 +15,23 @@
       }
       #audio{display:none}
       #status{
-        position:fixed;inset:0;display:grid;place-items:center;
-        color:#fff;font:14px/1.4 system-ui;text-align:center;pointer-events:none
+        position:fixed;top:30%;left:50%;transform:translateX(-50%);
+        width:80%;max-width:400px;
+        color:#fff;font:600 16px/1.4 system-ui;text-align:center;pointer-events:none;
+        background:rgba(0,0,0,0.7);padding:20px;border-radius:12px
       }
       #startBtn{
-        position:fixed;left:calc(50% - 70px);
-        top:calc(var(--circle-cy) + (var(--circle-d) / 2) - 60px);
-        width:140px;height:44px;border-radius:9999px;border:0;background:#000;color:#fff;
-        font:14px/44px system-ui;cursor:pointer;box-shadow:0 10px 30px rgba(0,0,0,.18)
+        position:fixed;left:50%;top:50%;
+        transform:translate(-50%, 20px);
+        width:140px;height:44px;border-radius:9999px;border:0;background:#fff;color:#000;
+        font:600 14px/44px system-ui;cursor:pointer;box-shadow:0 10px 30px rgba(0,0,0,.3);
+        z-index:100
       }
       #selfTest{
-        position:fixed;left:16px;bottom:16px;
-        padding:8px 12px;border-radius:9999px;border:0;background:#222;color:#fff;font:12px;opacity:.8
+        position:fixed;left:50%;bottom:20%;
+        transform:translateX(-50%);
+        padding:10px 16px;border-radius:9999px;border:0;background:#444;color:#fff;
+        font:600 12px system-ui;cursor:pointer;z-index:100
       }
     </style>
   </head>
