@@ -11,7 +11,7 @@ export default function StageSimli({ faceId, agentId, scale = 0.82 }: Props) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [status, setStatus] = useState("Loading…");
   const [ready, setReady] = useState(false);
-  const [connected, setConnected] = useState(false);
+  const [micEnabled, setMicEnabled] = useState(false);
   const [client, setClient] = useState<any>(null);
   const mountedRef = useRef(false);
   const micStreamRef = useRef<MediaStream | null>(null);
@@ -56,7 +56,7 @@ export default function StageSimli({ faceId, agentId, scale = 0.82 }: Props) {
         await init(cfg);
         if (cancelled) return;
 
-        c.on?.("connected", () => { setConnected(true); setStatus("Connected"); });
+        c.on?.("connected", () => { console.log("Simli WebRTC connected"); });
         c.on?.("error",     (e: any) => { console.error(e); setStatus("Simli error"); });
 
         setClient(c);
@@ -120,7 +120,7 @@ export default function StageSimli({ faceId, agentId, scale = 0.82 }: Props) {
         client.listenToMediastreamTrack(track);
       }
 
-      setConnected(true);
+      setMicEnabled(true);
       setStatus("Listening…");
     } catch (e: any) {
       console.error(e);
@@ -143,14 +143,14 @@ export default function StageSimli({ faceId, agentId, scale = 0.82 }: Props) {
         <audio ref={audioRef} autoPlay muted={false} />
         {/* tiny status overlay for debugging; remove later */}
         <div className="absolute inset-x-0 bottom-2 text-center text-[11px] text-white/75 pointer-events-none">
-          {connected ? "" : status}
+          {micEnabled ? "" : status}
         </div>
       </div>
 
       {/* Ring/frame */}
       <div className="absolute inset-0 rounded-full ring-2 ring-white/85 shadow-[0_40px_120px_rgba(0,0,0,0.15)] pointer-events-none" />
 
-      {!connected && (
+      {!micEnabled && (
         <button
           onClick={onConnect}
           disabled={!ready}
