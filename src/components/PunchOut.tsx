@@ -19,7 +19,7 @@ export default function PunchOut({
   return (
     <div
       aria-hidden
-      className="pointer-events-none fixed inset-0 bg-white z-10"
+      className="fixed inset-0 bg-white z-10 pointer-events-none"
       style={style}
     />
   );

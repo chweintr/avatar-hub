@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import SimliBackdrop from "./SimliBackdrop";
 import PunchOut from "./PunchOut";
 import StageFrame from "./StageFrame";
+import ConnectOverlay from "./ConnectOverlay";
 import { Dock } from "./Dock";
 import AnimatedBackground from "./AnimatedBackground";
 import GrainOverlay from "./GrainOverlay";
@@ -10,7 +11,13 @@ import { IS_SIMLI_LIVE } from "../config/env";
 
 export default function LandingApp() {
   const [active, setActive] = useState<DockAvatar | undefined>();
+  const [showConnect, setShowConnect] = useState(false);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
   const url = active && IS_SIMLI_LIVE ? active.simliUrl : undefined;
+
+  useEffect(() => {
+    setShowConnect(!!url);
+  }, [url]);
 
   return (
     <div className="relative min-h-screen bg-[#0a0e14]">
@@ -21,13 +28,24 @@ export default function LandingApp() {
       <GrainOverlay />
 
       {/* Layer 2: Simli iframe (only when avatar selected) */}
-      <SimliBackdrop url={url} />
+      <SimliBackdrop url={url} ref={iframeRef} />
 
       {/* Layer 3: white overlay with circular hole (only blocks Simli, not background) */}
       {url && <PunchOut cx="50%" cy="40vh" r="min(29vmin, 320px)" />}
 
       {/* Layer 4: visual ring on top */}
       <StageFrame cx="50%" cy="40vh" d="min(58vmin, 640px)" />
+
+      {/* Connect overlay */}
+      <ConnectOverlay
+        iframeRef={iframeRef}
+        visible={showConnect}
+        scale={0.82}
+        onReady={() => setShowConnect(false)}
+        cx="50%"
+        cy="40vh"
+        d="min(58vmin, 640px)"
+      />
 
       {/* UI (on top) */}
       <div className="relative z-30 mx-auto max-w-6xl px-6 pt-8 pb-16">
