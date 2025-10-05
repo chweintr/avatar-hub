@@ -105,27 +105,7 @@ export default function StageSimli({ faceId, agentId, scale = 0.82 }: Props) {
     if (!client) return;
 
     try {
-      // 1) Request mic (inside user gesture)
-      setStatus("Requesting mic…");
-      const mic = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
-      });
-      micStreamRef.current = mic;
-      const track = mic.getAudioTracks()[0];
-
-      // 2) Ensure we are NOT monitoring mic locally
-      if (audioRef.current?.srcObject === mic) {
-        audioRef.current.srcObject = null;
-      }
-
-      // 3) Give Simli the mic track (one-way → Simli)
-      if (track && client.listenToMediastreamTrack) {
-        await client.listenToMediastreamTrack(track);
-      } else if (track && client.sendAudioTrack) {
-        await client.sendAudioTrack(track);
-      }
-
-      // 4) Start Simli session
+      // 1) Start Simli session first
       setStatus("Connecting…");
       const start = client.start?.bind(client) || client.connect?.bind(client);
       if (!start) {
@@ -133,6 +113,25 @@ export default function StageSimli({ faceId, agentId, scale = 0.82 }: Props) {
         return;
       }
       await start();
+
+      // 2) Now request mic (user gesture) and send ONLY to Simli
+      setStatus("Requesting mic…");
+      const mic = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+      });
+      micStreamRef.current = mic;
+      const track = mic.getAudioTracks()[0];
+
+      // Never monitor the mic locally
+      if (audioRef.current?.srcObject === mic) {
+        audioRef.current.srcObject = null;
+      }
+
+      if (track && client.listenToMediastreamTrack) {
+        await client.listenToMediastreamTrack(track);
+      } else if (track && client.sendAudioTrack) {
+        await client.sendAudioTrack(track);
+      }
 
       setConnected(true);
       setStatus("Connected");
