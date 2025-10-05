@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width,initial-scale=1"/>
     <title>Simli Agent</title>
     <style>
-      :root { --simli-scale: 0.82; --circle-d: min(58vmin, 640px); --circle-cy: 40vh; }
+      :root { --simli-scale: 1.35; --circle-d: min(58vmin, 640px); --circle-cy: 40vh; }
       html,body{height:100%;margin:0;background:transparent;overflow:hidden}
       /* Fullscreen, centered, zoomable video */
       #video{
@@ -20,12 +20,11 @@
         position:fixed;inset:0;display:grid;place-items:center;
         color:#fff;font:14px/1.4 system-ui;text-align:center;pointer-events:none;z-index:1000
       }
-      /* In-iframe Connect button – must be visible */
+      /* In-iframe Connect button – centered and visible */
       #startBtn{
-        position:fixed;left:calc(50% - 70px);
-        top:calc(var(--circle-cy) + (var(--circle-d)/2) - 60px);
+        position:fixed;left:calc(50% - 70px);top:calc(50% - 22px);
         width:140px;height:44px;border:0;border-radius:9999px;background:#fff;color:#000;
-        font:14px/44px system-ui;cursor:pointer;box-shadow:0 10px 30px rgba(0,0,0,.18);z-index:1001
+        font:600 16px/44px system-ui;cursor:pointer;box-shadow:0 10px 30px rgba(0,0,0,.18);z-index:1001
       }
     </style>
   </head>
