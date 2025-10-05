@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import SimliBackdrop from "./SimliBackdrop";
 import PunchOut from "./PunchOut";
 import StageFrame from "./StageFrame";
@@ -9,11 +9,40 @@ import AnimatedBackground from "./AnimatedBackground";
 import GrainOverlay from "./GrainOverlay";
 import { AVATARS, type DockAvatar } from "../config/avatars";
 import { IS_SIMLI_LIVE } from "../config/env";
+import { DEBUG_SIMLI } from "../config/flags";
+import ConnectOverlay from "./ConnectOverlay";
 
 export default function LandingApp() {
   const [active, setActive] = useState<DockAvatar | undefined>();
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const url = active && IS_SIMLI_LIVE ? active.simliUrl : undefined;
+  const [showConnectOverlay, setShowConnectOverlay] = useState(false);
+
+  useEffect(() => {
+    if (url) {
+      setShowConnectOverlay(true);
+    } else {
+      setShowConnectOverlay(false);
+    }
+  }, [url]);
+
+  const overlayScale = useMemo(() => {
+    if (!active?.simliUrl) return undefined;
+    if (typeof window === "undefined") return undefined;
+
+    try {
+      const parsed = new URL(active.simliUrl, window.location.origin);
+      const scaleParam = parsed.searchParams.get("scale");
+      if (!scaleParam) return undefined;
+      const numeric = Number(scaleParam);
+      return Number.isFinite(numeric) ? numeric : undefined;
+    } catch (error) {
+      if (DEBUG_SIMLI) {
+        console.warn("Failed to parse Simli scale from URL", error);
+      }
+      return undefined;
+    }
+  }, [active?.simliUrl]);
 
   return (
     <div className="relative min-h-screen">
@@ -31,6 +60,19 @@ export default function LandingApp() {
 
       {/* Layer 4: visual ring on top */}
       <StageFrame cx="50%" cy="40vh" d="min(58vmin, 640px)" />
+
+      {/* Layer 5: connect overlay */}
+      {url && (
+        <ConnectOverlay
+          iframeRef={iframeRef}
+          visible={showConnectOverlay}
+          scale={overlayScale}
+          onReady={() => setShowConnectOverlay(false)}
+          cx="50%"
+          cy="40vh"
+          d="min(58vmin, 640px)"
+        />
+      )}
 
       {/* Nav bar */}
       <NavBar />

@@ -20,7 +20,10 @@ export default function ConnectOverlay({
   // Listen for SIMLI_READY to hide the button
   useEffect(() => {
     function onMsg(e: MessageEvent) {
-      if (e.data?.type === "SIMLI_READY") onReady?.();
+      if (e.origin !== window.location.origin) return;
+      if (e.data?.type === "SIMLI_READY" || e.data?.type === "SIMLI_CONNECTED") {
+        onReady?.();
+      }
     }
     window.addEventListener("message", onMsg);
     return () => window.removeEventListener("message", onMsg);
@@ -46,7 +49,18 @@ export default function ConnectOverlay({
       <button
         onClick={() => {
           const win = iframeRef.current?.contentWindow;
-          win?.postMessage({ type: "SIMLI_START" }, window.location.origin);
+          if (!win) return;
+
+          win.postMessage({ type: "SIMLI_START" }, window.location.origin);
+
+          try {
+            const startBtn = win.document?.getElementById("startBtn") as
+              | HTMLButtonElement
+              | null;
+            startBtn?.click();
+          } catch (error) {
+            console.warn("Failed to trigger Simli start button", error);
+          }
         }}
         style={{
           position: "absolute",

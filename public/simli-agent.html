@@ -6,9 +6,9 @@
   <title>Simli Agent</title>
   <style>
     :root { --simli-scale: 0.80; --circle-d: min(58vmin, 640px); --circle-cy: 40vh; }
-    html,body{height:100%;margin:0;background:#000}
-    #video{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%) scale(var(--simli-scale));
-           width:100vw;height:100vh;object-fit:cover;background:#000;outline:2px solid rgba(255,0,0,.15)}
+    html,body{height:100%;margin:0;background:#000;overflow:hidden}
+    #video{position:fixed;left:0;top:0;width:100vw;height:100vh;object-fit:cover;background:#000;
+           transform:scale(var(--simli-scale));transform-origin:center center}
     #audio{display:none}
     #status{position:fixed;inset:0;display:grid;place-items:center;color:#fff;font:14px system-ui;
             text-align:center;pointer-events:none;z-index:1000}
@@ -32,6 +32,8 @@
     const selfBtn = document.getElementById('selfTest');
     const video = document.getElementById('video');
     const audio = document.getElementById('audio');
+    let hasStarted = false;
+    let isStarting = false;
     const say = (m) => { console.log('[simli]', m); status.textContent = m; };
 
     // Params
@@ -84,19 +86,36 @@
     await init(initCfg);
     say('Ready. Click Connect.');
 
-    // Step 4: user gesture inside iframe
-    startBtn.onclick = async () => {
+    async function startSimli(trigger = 'button') {
+      if (isStarting || hasStarted) return;
+      isStarting = true;
+      startBtn.disabled = true;
       try {
         say('Starting…');
         const start = client.start?.bind(client) || client.connect?.bind(client);
         if (!start) throw new Error('No start/connect on client');
         await start();
+        hasStarted = true;
         startBtn.style.display = 'none';
         say('Connected.');
-      } catch (e) { console.error(e); say('Start failed: ' + (e?.message || e)); }
-    };
+        window.parent?.postMessage({ type: 'SIMLI_CONNECTED', payload: { trigger } }, location.origin);
+      } catch (e) {
+        console.error(e);
+        say('Start failed: ' + (e?.message || e));
+        startBtn.disabled = false;
+      } finally {
+        isStarting = false;
+      }
+    }
 
-    client.on?.('connected', () => say('Connected (event).'));
+    // Step 4: user gesture inside iframe
+    startBtn.onclick = () => { startSimli('button'); };
+
+    client.on?.('connected', () => {
+      hasStarted = true;
+      say('Connected (event).');
+      window.parent?.postMessage({ type: 'SIMLI_CONNECTED', payload: { trigger: 'event' } }, location.origin);
+    });
     client.on?.('failed',    () => say('Simli failed'));
     client.on?.('error',  e  => { console.error(e); say('Simli error: ' + (e?.message || e)); });
 
@@ -105,6 +124,9 @@
       if (e.origin !== location.origin) return;
       if (e.data?.type === 'SIMLI_SET_SCALE') {
         const v = Number(e.data?.payload); if (!Number.isNaN(v)) document.documentElement.style.setProperty('--simli-scale', String(v));
+      }
+      if (e.data?.type === 'SIMLI_START') {
+        startSimli('message');
       }
     });
   </script>
