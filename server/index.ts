@@ -59,7 +59,16 @@ app.get('/api/livekit-token', async (req, res) => {
   const url = process.env.LIVEKIT_URL;
 
   if (!apiKey || !apiSecret || !url) {
-    return res.status(500).json({ error: 'LiveKit env missing' });
+    const missing = [];
+    if (!apiKey) missing.push('LIVEKIT_API_KEY');
+    if (!apiSecret) missing.push('LIVEKIT_API_SECRET');
+    if (!url) missing.push('LIVEKIT_URL');
+
+    return res.status(500).json({
+      error: 'LiveKit configuration missing',
+      missing,
+      help: 'Set these environment variables in Railway or create a .env file locally'
+    });
   }
 
   const at = new AccessToken(apiKey, apiSecret, {
