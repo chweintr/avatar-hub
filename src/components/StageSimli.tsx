@@ -94,54 +94,36 @@ export default function StageSimli({ faceId, agentId, scale = 0.82 }: Props) {
 
   async function onConnect() {
     if (!client) return;
-    // Enable microphone for voice interaction
-    setStatus("Requesting mic…");
+
+    // When using agentId, we need to explicitly enable bidirectional audio
+    setStatus("Starting conversation…");
     try {
-      const mic = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        }
-      });
-
-      // Store for cleanup
-      micStreamRef.current = mic;
-
-      const track = mic.getAudioTracks()[0];
-
-      // CRITICAL: Ensure audioRef never gets the mic stream (would cause monitoring/feedback)
-      if (audioRef.current?.srcObject === mic) {
-        audioRef.current.srcObject = null;
+      // Start audio streaming with the agent
+      if (client.StartAudioToAudioSession) {
+        await client.StartAudioToAudioSession();
+        setMicEnabled(true);
+        setStatus("Connected");
+      } else if (client.startAudioToAudioSession) {
+        await client.startAudioToAudioSession();
+        setMicEnabled(true);
+        setStatus("Connected");
+      } else {
+        console.warn("No StartAudioToAudioSession method found - using fallback mic approach");
+        // Fallback: just request permission (agent backend may auto-connect)
+        const mic = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+          }
+        });
+        micStreamRef.current = mic;
+        setMicEnabled(true);
+        setStatus("Connected");
       }
-
-      // Explicitly mute the audio element temporarily to prevent any initial feedback
-      if (audioRef.current) {
-        audioRef.current.muted = true;
-      }
-
-      // Give Simli the audio source for voice interaction
-      if (client.listenToMediastreamTrack && track) {
-        await client.listenToMediastreamTrack(track);
-      }
-
-      setMicEnabled(true);
-      setStatus("Listening…");
-
-      // Trigger the agent to say the intro greeting
-      // Wait a moment for connection to stabilize, then unmute and send greeting
-      setTimeout(async () => {
-        if (audioRef.current) {
-          audioRef.current.muted = false;
-        }
-        // Send intro message to trigger agent greeting
-        if (client.sendText) {
-          await client.sendText("Hello");
-        }
-      }, 500);
     } catch (e: any) {
       console.error(e);
-      setStatus("Mic blocked: " + (e?.message ?? String(e)));
+      setStatus("Connection failed: " + (e?.message ?? String(e)));
     }
   }
 
