@@ -15,11 +15,13 @@ export default function PunchOut({
   const style: React.CSSProperties = {
     WebkitMaskImage: mask,
     maskImage: mask,
+    zIndex: 15,
+    pointerEvents: "none",
   };
   return (
     <div
       aria-hidden
-      className="fixed inset-0 bg-white z-10 pointer-events-none"
+      className="fixed inset-0 bg-white"
       style={style}
     />
   );
