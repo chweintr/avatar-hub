@@ -15,23 +15,20 @@
       }
       #audio{display:none}
       #status{
-        position:fixed;top:30%;left:50%;transform:translateX(-50%);
-        width:80%;max-width:400px;
-        color:#fff;font:600 16px/1.4 system-ui;text-align:center;pointer-events:none;
-        background:rgba(0,0,0,0.7);padding:20px;border-radius:12px
+        position:fixed;top:35%;left:50%;transform:translateX(-50%);
+        width:70%;
+        color:#fff;font:600 14px/1.4 system-ui;text-align:center;pointer-events:none;
+        background:rgba(0,0,0,0.8);padding:12px 16px;border-radius:12px
       }
       #startBtn{
-        position:fixed;left:50%;top:50%;
-        transform:translate(-50%, 20px);
-        width:140px;height:44px;border-radius:9999px;border:0;background:#fff;color:#000;
-        font:600 14px/44px system-ui;cursor:pointer;box-shadow:0 10px 30px rgba(0,0,0,.3);
+        position:fixed;left:50%;top:60%;
+        transform:translateX(-50%);
+        width:120px;height:40px;border-radius:9999px;border:0;background:#fff;color:#000;
+        font:600 13px/40px system-ui;cursor:pointer;box-shadow:0 8px 24px rgba(0,0,0,.4);
         z-index:100
       }
       #selfTest{
-        position:fixed;left:50%;bottom:20%;
-        transform:translateX(-50%);
-        padding:10px 16px;border-radius:9999px;border:0;background:#444;color:#fff;
-        font:600 12px system-ui;cursor:pointer;z-index:100
+        display:none
       }
     </style>
   </head>
@@ -40,12 +37,10 @@
     <video id="video" autoplay playsinline></video>
     <audio id="audio" autoplay></audio>
     <button id="startBtn">Connect</button>
-    <button id="selfTest" title="Bypass SDK; show webcam directly">Self-test camera</button>
 
     <script type="module">
       const status  = document.getElementById("status");
       const startBtn= document.getElementById("startBtn");
-      const selfBtn = document.getElementById("selfTest");
       const video   = document.getElementById("video");
       const audio   = document.getElementById("audio");
       const log = (msg) => { console.log("[simli]", msg); status.textContent = msg; };
@@ -57,17 +52,6 @@
       if (!Number.isNaN(scaleQP)) document.documentElement.style.setProperty("--simli-scale", String(scaleQP));
 
       startBtn.addEventListener("click", () => console.log("[simli] connect clicked"));
-
-      selfBtn.addEventListener("click", async () => {
-        try {
-          log("Self-test: requesting camera…");
-          const s = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-          video.srcObject = s;
-          status.textContent = "Self-test running (camera).";
-        } catch (e) {
-          status.textContent = "Self-test failed: " + (e?.message || e);
-        }
-      });
 
       try {
         if (!faceID) throw new Error("Missing faceId");
