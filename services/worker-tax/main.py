@@ -1,60 +1,119 @@
-import asyncio
 import os
-from livekit import agents, rtc
-from livekit.plugins import simli
+from dotenv import load_dotenv
+from loguru import logger
+from simli import SimliConfig
 
-async def entrypoint(ctx: agents.JobContext):
-    # Configuration from environment
-    room_name = os.getenv("LIVEKIT_ROOM", "avatar-tax")
-    face_id = os.getenv("FACE_ID_1")
-    agent_id = os.getenv("SIMLI_AGENT_ID_TAX")
-    simli_api_key = os.getenv("SIMLI_API_KEY")
+from pipecat.audio.vad.silero import SileroVADAnalyzer
+from pipecat.pipeline.pipeline import Pipeline
+from pipecat.pipeline.runner import PipelineRunner
+from pipecat.pipeline.task import PipelineParams, PipelineTask
+from pipecat.processors.aggregators.openai_llm_context import OpenAILLMContext
+from pipecat.services.cartesia.tts import CartesiaTTSService
+from pipecat.services.deepgram.stt import DeepgramSTTService
+from pipecat.services.openai.llm import OpenAILLMService
+from pipecat.services.simli.video import SimliVideoService
+from pipecat.transports.base_transport import TransportParams
+from pipecat.transports.services.daily import DailyParams, DailyTransport
 
-    # Connect to LiveKit room
-    await ctx.connect()
+load_dotenv(override=True)
 
-    # Initialize Simli avatar
-    avatar = simli.Avatar(
-        api_key=simli_api_key,
-        face_id=face_id,
-        agent_id=agent_id
+
+async def main():
+    """Tax Advisor Avatar - Pipecat + Simli Pipeline"""
+
+    # Daily.co room configuration (for WebRTC only, not Daily Bots)
+    transport = DailyTransport(
+        os.getenv("DAILY_ROOM_URL"),
+        os.getenv("DAILY_TOKEN"),
+        "Tax Advisor Bot",
+        DailyParams(
+            audio_in_enabled=True,
+            audio_out_enabled=True,
+            video_out_enabled=True,
+            video_out_is_live=True,
+            video_out_width=512,
+            video_out_height=512,
+            vad_analyzer=SileroVADAnalyzer(),
+        ),
     )
 
-    # Set up audio/video tracks
-    audio_source = rtc.AudioSource(sample_rate=16000, num_channels=1)
-    video_source = rtc.VideoSource(width=512, height=512)
+    # Speech-to-Text
+    stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"))
 
-    audio_track = rtc.LocalAudioTrack.create_audio_track("avatar-audio", audio_source)
-    video_track = rtc.LocalVideoTrack.create_video_track("avatar-video", video_source)
+    # Text-to-Speech
+    tts = CartesiaTTSService(
+        api_key=os.getenv("CARTESIA_API_KEY"),
+        voice_id=os.getenv("CARTESIA_VOICE_ID", "79a125e8-cd45-4c13-8a67-188112f4dd22"),
+    )
 
-    # Publish tracks to room
-    await ctx.room.local_participant.publish_track(audio_track)
-    await ctx.room.local_participant.publish_track(video_track)
+    # Simli Avatar (lip-sync from TTS audio)
+    simli_service = SimliVideoService(
+        SimliConfig(
+            os.getenv("SIMLI_API_KEY"),
+            os.getenv("SIMLI_FACE_ID")
+        ),
+    )
 
-    # Listen for user audio
-    @ctx.room.on("track_subscribed")
-    def on_track_subscribed(track: rtc.Track, publication: rtc.TrackPublication, participant: rtc.RemoteParticipant):
-        if track.kind == rtc.TrackKind.KIND_AUDIO:
-            asyncio.create_task(handle_user_audio(track, avatar, audio_source, video_source))
+    # Large Language Model
+    llm = OpenAILLMService(
+        api_key=os.getenv("OPENAI_API_KEY"),
+        model="gpt-4o-mini"
+    )
 
-    # Keep running
-    await asyncio.Future()
+    # System prompt for tax advisor
+    messages = [
+        {
+            "role": "system",
+            "content": """You are a knowledgeable tax advisor specializing in helping artists, creatives, and freelancers.
+Provide clear, practical tax advice. Be conversational and friendly.
+Keep responses concise (2-3 sentences) unless asked for details."""
+        },
+    ]
 
-async def handle_user_audio(track: rtc.Track, avatar, audio_source, video_source):
-    """Process user audio through Simli avatar"""
-    audio_stream = rtc.AudioStream(track)
+    context = OpenAILLMContext(messages)
+    context_aggregator = llm.create_context_aggregator(context)
 
-    async for frame in audio_stream:
-        # Send user audio to Simli
-        response = await avatar.process_audio(frame)
+    # Pipeline: User Audio → STT → LLM → TTS → Simli (bot audio only!)
+    pipeline = Pipeline(
+        [
+            transport.input(),           # User microphone
+            stt,                          # Speech to text
+            context_aggregator.user(),   # Add to conversation
+            llm,                          # Generate response
+            tts,                          # Synthesize speech
+            simli_service,                # Lip-sync avatar (receives TTS audio, NOT mic!)
+            transport.output(),           # Send avatar video/audio to user
+            context_aggregator.assistant(),
+        ]
+    )
 
-        # Push Simli's audio response to LiveKit
-        if response.audio:
-            await audio_source.capture_frame(response.audio)
+    task = PipelineTask(
+        pipeline,
+        params=PipelineParams(
+            enable_metrics=True,
+            enable_usage_metrics=True,
+        ),
+    )
 
-        # Push Simli's video response to LiveKit
-        if response.video:
-            await video_source.capture_frame(response.video)
+    @transport.event_handler("on_first_participant_joined")
+    async def on_first_participant_joined(transport, participant):
+        logger.info(f"First participant joined: {participant['id']}")
+        await transport.capture_participant_transcription(participant["id"])
+        await task.queue_frames([context_aggregator.user().get_context_frame()])
+
+    @transport.event_handler("on_participant_left")
+    async def on_participant_left(transport, participant, reason):
+        logger.info(f"Participant left: {participant['id']}")
+        await task.cancel()
+
+    @transport.event_handler("on_call_state_updated")
+    async def on_call_state_updated(transport, state):
+        logger.info(f"Call state: {state}")
+
+    runner = PipelineRunner()
+    await runner.run(task)
+
 
 if __name__ == "__main__":
-    agents.cli.run_app(agents.WorkerOptions(entrypoint_fnc=entrypoint))
+    import asyncio
+    asyncio.run(main())
