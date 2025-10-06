@@ -1,0 +1,114 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Simli Smoke</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- Load Simli UMD (global) -->
+  <script defer src="https://cdn.jsdelivr.net/npm/simli-client@1.2.15/dist/index.umd.js"></script>
+  <style>
+    html, body { margin:0; background:#000; color:#fff; font-family:Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial; }
+    .stage { position:relative; width:min(58vmin,640px); height:min(58vmin,640px); margin:6vh auto 0; }
+    .mask { position:absolute; inset:0; border-radius:9999px; overflow:hidden; background:#000; }
+    .video { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+    .ring  { position:absolute; inset:0; border-radius:9999px; box-shadow:0 0 0 2px rgba(255,255,255,.85) inset; pointer-events:none; }
+    .btn   { position:absolute; left:50%; transform:translateX(-50%); bottom:18px; background:#fff; color:#000; border-radius:999px; padding:.6rem 1rem; font-size:.9rem; }
+    .status{ position:absolute; left:50%; transform:translateX(-50%); top:10px; font-size:.72rem; opacity:.7; }
+    .dock  { margin:40px auto; width: min(92vw, 800px); text-align:center; }
+  </style>
+</head>
+<body>
+  <div class="stage">
+    <div class="mask">
+      <video id="simli-video" class="video" autoplay playsinline></video>
+      <audio id="simli-audio" autoplay></audio>
+    </div>
+    <div class="ring"></div>
+    <button id="connect" class="btn">Connect</button>
+    <div id="status" class="status">Loading…</div>
+  </div>
+
+  <div class="dock">
+    <small>Tip: you can pass params: <code>?face=FACE_UUID&amp;agent=AGENT_UUID&amp;scale=0.80</code></small>
+  </div>
+
+  <script>
+    (async function () {
+      const q = new URLSearchParams(location.search);
+      const faceId = q.get("face") || "afdb6a3e-3939-40aa-92df-01604c23101c";   // your tax face
+      const agentId = q.get("agent") || "d951e6dc-c098-43fb-a34f-e970cd339ea6"; // your agent (optional)
+      const scale   = parseFloat(q.get("scale") || "0.82");
+
+      const $video  = document.getElementById("simli-video");
+      const $audio  = document.getElementById("simli-audio");
+      const $btn    = document.getElementById("connect");
+      const $status = document.getElementById("status");
+
+      function setStatus(s){ $status.textContent = s; console.log("[simli]", s); }
+
+      try {
+        setStatus("Fetching token…");
+        const r = await fetch("/api/simli-config", { cache: "no-store" });
+        if (!r.ok) throw new Error("HTTP "+r.status);
+        const { apiKey } = await r.json();
+        if (!apiKey) throw new Error("No SIMLI_API_KEY on server");
+
+        setStatus("Waiting for SDK…");
+        const SimliCtor = await new Promise((resolve, reject) => {
+          const start = Date.now();
+          (function poll(){
+            const g = window.SimliClient || window.Simli || window.default;
+            if (g) return resolve(g.SimliClient || g.default || g);
+            if (Date.now()-start > 6000) return reject(new Error("Simli UMD not found"));
+            requestAnimationFrame(poll);
+          })();
+        });
+        if (typeof SimliCtor !== "function") throw new Error("Bad SimliClient export");
+
+        setStatus("Creating client…");
+        const client = new SimliCtor();
+
+        const initialize = client.Initialize?.bind(client) || client.initialize?.bind(client);
+        if (!initialize) throw new Error("No Initialize/initialize on client");
+
+        const cfg = {
+          apiKey,
+          faceID: faceId, faceId,
+          videoRef: $video,
+          audioRef: $audio,
+          handleSilence: true,
+          enableConsoleLogs: true,
+        };
+        if (agentId) cfg.agentId = agentId;
+
+        setStatus("Initializing…");
+        await initialize(cfg);
+
+        // Safety: never route mic to speakers in our code
+        try { if ($audio && $audio.srcObject) { $audio.srcObject = null; } } catch {}
+
+        client.on?.("connected", () => setStatus("Connected"));
+        client.on?.("error", (e) => { console.error(e); setStatus("Simli error"); });
+
+        // scale video to fit the circle
+        $video.style.transform = `scale(${isFinite(scale) ? scale : 0.82})`;
+
+        $btn.disabled = false;
+        setStatus("Ready. Click Connect.");
+        $btn.onclick = async () => {
+          $btn.disabled = true;
+          setStatus("Starting…");
+          const start = client.start?.bind(client) || client.connect?.bind(client);
+          if (!start) { setStatus("No start/connect on client"); return; }
+          try { await start(); setStatus("Connected"); }
+          catch (e){ console.error(e); setStatus("Start failed: " + (e?.message || e)); $btn.disabled = false; }
+        };
+      } catch (e) {
+        console.error(e);
+        setStatus("Init error: " + (e?.message || e));
+        $btn.disabled = true;
+      }
+    })();
+  </script>
+</body>
+</html>
