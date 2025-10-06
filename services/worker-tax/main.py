@@ -8,20 +8,18 @@ from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
 from pipecat.processors.aggregators.openai_llm_context import OpenAILLMContext
-from pipecat.services.cartesia.tts import CartesiaTTSService
-from pipecat.services.deepgram.stt import DeepgramSTTService
-from pipecat.services.openai.llm import OpenAILLMService
+from pipecat.services.elevenlabs import ElevenLabsTTSService
+from pipecat.services.openai import OpenAILLMService
 from pipecat.services.simli.video import SimliVideoService
-from pipecat.transports.base_transport import TransportParams
 from pipecat.transports.services.daily import DailyParams, DailyTransport
 
 load_dotenv(override=True)
 
 
 async def main():
-    """Tax Advisor Avatar - Pipecat + Simli Pipeline"""
+    """Tax Advisor Avatar - Uses ONLY OpenAI + ElevenLabs + Simli"""
 
-    # Daily.co room configuration (for WebRTC only, not Daily Bots)
+    # Daily.co WebRTC transport (free tier for rooms)
     transport = DailyTransport(
         os.getenv("DAILY_ROOM_URL"),
         os.getenv("DAILY_TOKEN"),
@@ -34,19 +32,17 @@ async def main():
             video_out_width=512,
             video_out_height=512,
             vad_analyzer=SileroVADAnalyzer(),
+            transcription_enabled=True,  # OpenAI Whisper for STT
         ),
     )
 
-    # Speech-to-Text
-    stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"))
-
-    # Text-to-Speech
-    tts = CartesiaTTSService(
-        api_key=os.getenv("CARTESIA_API_KEY"),
-        voice_id=os.getenv("CARTESIA_VOICE_ID", "79a125e8-cd45-4c13-8a67-188112f4dd22"),
+    # Text-to-Speech via ElevenLabs (you already have API key)
+    tts = ElevenLabsTTSService(
+        api_key=os.getenv("ELEVENLABS_API_KEY"),
+        voice_id=os.getenv("ELEVENLABS_VOICE_ID", "21m00Tcm4TlvDq8ikWAM"),  # Default voice
     )
 
-    # Simli Avatar (lip-sync from TTS audio)
+    # Simli Avatar (lip-sync from ElevenLabs audio)
     simli_service = SimliVideoService(
         SimliConfig(
             os.getenv("SIMLI_API_KEY"),
@@ -54,7 +50,7 @@ async def main():
         ),
     )
 
-    # Large Language Model
+    # LLM via OpenAI (you already have API key)
     llm = OpenAILLMService(
         api_key=os.getenv("OPENAI_API_KEY"),
         model="gpt-4o-mini"
@@ -73,15 +69,15 @@ Keep responses concise (2-3 sentences) unless asked for details."""
     context = OpenAILLMContext(messages)
     context_aggregator = llm.create_context_aggregator(context)
 
-    # Pipeline: User Audio → STT → LLM → TTS → Simli (bot audio only!)
+    # Pipeline: User Audio → OpenAI Whisper (STT) → LLM → ElevenLabs (TTS) → Simli
     pipeline = Pipeline(
         [
             transport.input(),           # User microphone
-            stt,                          # Speech to text
+            # STT handled by Daily transcription (OpenAI Whisper)
             context_aggregator.user(),   # Add to conversation
             llm,                          # Generate response
-            tts,                          # Synthesize speech
-            simli_service,                # Lip-sync avatar (receives TTS audio, NOT mic!)
+            tts,                          # ElevenLabs synthesizes speech
+            simli_service,                # Simli lip-syncs to TTS audio (NOT mic!)
             transport.output(),           # Send avatar video/audio to user
             context_aggregator.assistant(),
         ]
