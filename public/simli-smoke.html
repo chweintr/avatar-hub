@@ -1,167 +1,59 @@
 <!doctype html>
 <html>
-<head>
-  <meta charset="utf-8" />
-  <title>Simli Smoke</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <!-- Load Simli UMD (global) -->
-  <script defer src="https://cdn.jsdelivr.net/npm/simli-client@1.2.15/dist/index.umd.js"></script>
-  <style>
-    html, body { margin:0; background:#000; color:#fff; font-family:Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial; }
-    .stage { position:relative; width:min(58vmin,640px); height:min(58vmin,640px); margin:6vh auto 0; }
-    .mask { position:absolute; inset:0; border-radius:9999px; overflow:hidden; background:#000; }
-    .video { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
-    .ring  { position:absolute; inset:0; border-radius:9999px; box-shadow:0 0 0 2px rgba(255,255,255,.85) inset; pointer-events:none; }
-    .btn   { position:absolute; left:50%; transform:translateX(-50%); bottom:18px; background:#fff; color:#000; border-radius:999px; padding:.6rem 1rem; font-size:.9rem; }
-    .status{ position:absolute; left:50%; transform:translateX(-50%); top:10px; font-size:.72rem; opacity:.7; }
-    .dock  { margin:40px auto; width: min(92vw, 800px); text-align:center; }
-  </style>
-</head>
-<body>
-  <div class="stage">
-    <div class="mask">
-      <video id="simli-video" class="video" autoplay playsinline></video>
-      <audio id="simli-audio" autoplay></audio>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Simli Smoke</title>
+    <script src="https://cdn.jsdelivr.net/npm/simli-client@1.2.15/dist/simli-client.umd.js"></script>
+    <style>
+      body { background:#000; color:#fff; display:grid; place-items:center; height:100svh; margin:0; }
+      .circle { width:min(58vmin,640px); height:min(58vmin,640px); border-radius:9999px; overflow:hidden; position:relative; }
+      video, audio { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+      button { position:absolute; left:50%; transform:translateX(-50%); bottom:20px; }
+      .ring { position:absolute; inset:0; border:2px solid #fff; border-radius:9999px; pointer-events:none; opacity:.85 }
+      #status { position:absolute; top:10px; left:50%; transform:translateX(-50%); font:12px/1 system-ui; color:#ccc }
+    </style>
+  </head>
+  <body>
+    <div class="circle">
+      <video id="v" autoplay playsinline></video>
+      <audio id="a" autoplay playsinline></audio>
+      <div class="ring"></div>
+      <div id="status">Loading…</div>
+      <button id="btn">Connect</button>
     </div>
-    <div class="ring"></div>
-    <button id="connect" class="btn">Connect</button>
-    <div id="status" class="status">Loading…</div>
-  </div>
-
-  <div class="dock">
-    <small>Tip: you can pass params: <code>?face=FACE_UUID&amp;agent=AGENT_UUID&amp;scale=0.80</code></small>
-  </div>
-
-  <script>
-    (async function () {
-      const q = new URLSearchParams(location.search);
-      const faceId = q.get("face") || "afdb6a3e-3939-40aa-92df-01604c23101c";   // your tax face
-      const agentId = q.get("agent") || "d951e6dc-c098-43fb-a34f-e970cd339ea6"; // your agent (optional)
-      const scale   = parseFloat(q.get("scale") || "0.82");
-
-      const $video  = document.getElementById("simli-video");
-      const $audio  = document.getElementById("simli-audio");
-      const $btn    = document.getElementById("connect");
-      const $status = document.getElementById("status");
-
-      function setStatus(s){ $status.textContent = s; console.log("[simli]", s); }
-
-      try {
-        setStatus("Fetching token…");
-        const r = await fetch("/api/simli-config", { cache: "no-store" });
-        if (!r.ok) throw new Error("HTTP "+r.status);
-        const { apiKey } = await r.json();
-        if (!apiKey) throw new Error("No SIMLI_API_KEY on server");
-
-        setStatus("Waiting for SDK…");
-        const SimliCtor = await new Promise((resolve, reject) => {
-          const start = Date.now();
-          (function poll(){
-            const g = window.SimliClient || window.Simli || window.default;
-            if (g) return resolve(g.SimliClient || g.default || g);
-            if (Date.now()-start > 6000) return reject(new Error("Simli UMD not found"));
-            requestAnimationFrame(poll);
-          })();
-        });
-        if (typeof SimliCtor !== "function") throw new Error("Bad SimliClient export");
-
-        setStatus("Creating client…");
-        const client = new SimliCtor();
-
-        const initialize = client.Initialize?.bind(client) || client.initialize?.bind(client);
-        if (!initialize) throw new Error("No Initialize/initialize on client");
-
-        const cfg = {
-          apiKey,
-          faceID: faceId, faceId,
-          videoRef: $video,
-          audioRef: $audio,
-          handleSilence: true,
-          enableConsoleLogs: true,
-          // Hints to avoid WebAudio issues (won't break if SDK ignores)
-          preferAudioElement: true,
-          disableWebAudio: true,
-          audioMode: 'element'
-        };
-        if (agentId) cfg.agentId = agentId;
-
-        setStatus("Initializing…");
-        await initialize(cfg);
-
-        // Safety: never route mic to speakers in our code
-        try { if ($audio && $audio.srcObject) { $audio.srcObject = null; } } catch {}
-
-        // Diagnostics
-        client.on?.("connected", () => { console.log("[simli] connected"); setStatus("Connected"); });
-        client.on?.("error", (e) => { console.error("[simli] error event:", e); setStatus("Simli error"); });
-        $audio.addEventListener("error", (ev) => {
-          console.error("[audio] tag error", ev, $audio.error);
-        });
-
-        // Log audio capabilities
-        console.log("mediaCapabilities", navigator.mediaCapabilities ?? "n/a");
-        console.log("Navigator userAgent:", navigator.userAgent);
-
-        // scale video to fit the circle
-        $video.style.transform = `scale(${isFinite(scale) ? scale : 0.82})`;
-
-        $btn.disabled = false;
-        setStatus("Ready. Click Connect.");
-        $btn.onclick = async () => {
-          $btn.disabled = true;
-          setStatus("Starting…");
-
-          // AudioContext unlock probe (user gesture required)
-          try {
-            const AC = window.AudioContext || window.webkitAudioContext;
-            if (AC) {
-              const ac = new AC();
-              console.log("[audio] AudioContext state:", ac.state);
-              if (ac.state === "suspended") {
-                console.log("[audio] Resuming suspended AudioContext...");
-                await ac.resume();
-              }
-              await ac.close();
-              console.log("[audio] AudioContext unlock probe complete");
-            }
-          } catch (e) {
-            console.warn("[audio] AudioContext unlock probe failed:", e);
-          }
-
-          // Test autoplay policy
-          try {
-            const playTest = await $audio.play();
-            console.log("[audio] autoplay policy check: ok");
-            $audio.pause();
-          } catch (e) {
-            console.log("[audio] autoplay policy check:", e?.name || e);
-          }
-
-          const start = client.start?.bind(client) || client.connect?.bind(client);
-          if (!start) { setStatus("No start/connect on client"); return; }
-
-          try {
-            await start();
-            // Nudge audio element to play in case autoplay was blocked
-            try {
-              await $audio.play();
-              console.log("[audio] play() after start: success");
-            } catch (playErr) {
-              console.warn("[audio] play() after start failed:", playErr);
-            }
-            setStatus("Connected");
-          } catch (e) {
-            console.error("[simli] Start failed:", e);
-            setStatus("Start failed: " + (e?.message || e));
-            $btn.disabled = false;
-          }
-        };
-      } catch (e) {
-        console.error(e);
-        setStatus("Init error: " + (e?.message || e));
-        $btn.disabled = true;
-      }
-    })();
-  </script>
-</body>
+    <script>
+      const statusEl = document.getElementById('status');
+      const btn = document.getElementById('btn');
+      let client;
+      (async () => {
+        try {
+          statusEl.textContent = "Fetching key…";
+          const r = await fetch("/api/simli-config");
+          if (!r.ok) throw new Error("HTTP " + r.status);
+          const { apiKey, faceId } = await r.json();
+          const Ctor = window.SimliClient?.SimliClient || window.SimliClient?.default || window.SimliClient;
+          if (!Ctor) throw new Error("Simli UMD not found");
+          client = new Ctor();
+          const init = client.Initialize || client.initialize;
+          await init({
+            apiKey, faceId, faceID: faceId,
+            videoRef: document.getElementById('v'), audioRef: document.getElementById('a'),
+            enableConsoleLogs: true,
+          });
+          statusEl.textContent = "Ready";
+        } catch (e) {
+          statusEl.textContent = "Init error: " + (e?.message || e);
+          console.error(e);
+        }
+      })();
+      btn.onclick = async () => {
+        try {
+          const mic = await navigator.mediaDevices.getUserMedia({ audio: true });
+          await (client.listenToMediastreamTrack?.(mic.getAudioTracks()[0]) ?? Promise.reject("no mic method"));
+          await (client.start?.() ?? client.connect?.());
+        } catch (e) { statusEl.textContent = "Start failed: " + (e?.message || e) }
+      };
+    </script>
+  </body>
 </html>

@@ -1,11 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { getSimliClient } from "../lib/simliClient";
 
-type Props = {
-  faceId: string;
-  agentId?: string;
-  scale?: number;
-};
+type Props = { faceId: string; agentId?: string; scale?: number };
 
 export default function StageSimli({ faceId, agentId, scale = 0.82 }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -17,39 +12,32 @@ export default function StageSimli({ faceId, agentId, scale = 0.82 }: Props) {
 
   useEffect(() => {
     let cancelled = false;
-
     (async () => {
       try {
-        setStatus("Fetching Simli token…");
+        setStatus("Fetching key…");
         const r = await fetch("/api/simli-config", { cache: "no-store" });
         if (!r.ok) throw new Error("HTTP " + r.status);
         const { apiKey } = await r.json();
-        if (!apiKey) throw new Error("No SIMLI_API_KEY");
 
-        setStatus("Loading SDK…");
-        const c = await getSimliClient();
+        const SimliCtor =
+          (window as any).SimliClient?.SimliClient ||
+          (window as any).SimliClient?.default ||
+          (window as any).SimliClient;
+        if (!SimliCtor) throw new Error("Simli UMD not found");
 
-        // Some SDKs expose Initialize vs initialize — support both
-        const initialize =
-          (c.Initialize && c.Initialize.bind(c)) ||
-          (c.initialize && c.initialize.bind(c));
-        if (!initialize) throw new Error("No Initialize/initialize");
+        const c = new (SimliCtor as any)();
+        const init = c.Initialize?.bind(c) || c.initialize?.bind(c);
+        if (!init) throw new Error("No Initialize/initialize");
 
-        const cfg: any = {
+        await init({
           apiKey,
           faceID: faceId, faceId,
+          ...(agentId ? { agentId } : {}),
           videoRef: videoRef.current!,
           audioRef: audioRef.current!,
           handleSilence: true,
           enableConsoleLogs: true,
-          // Safe hint: many SDKs will prefer direct <audio> playback
-          preferAudioElement: true, // no-op if unsupported
-        };
-        if (agentId) cfg.agentId = agentId;
-
-        setStatus("Initializing…");
-        await initialize(cfg);
-        if (cancelled) return;
+        });
 
         c.on?.("error", (e: any) => {
           console.error("[simli] error", e);
@@ -58,74 +46,82 @@ export default function StageSimli({ faceId, agentId, scale = 0.82 }: Props) {
         c.on?.("connected", () => {
           setConnected(true);
           setStatus("Connected");
-          // Nudge the HTMLAudioElement in case autoplay was paused
           audioRef.current?.play?.().catch(() => {});
         });
 
         setClient(c);
         setReady(true);
-        setStatus("Ready. Click Connect.");
+        setStatus("Ready");
       } catch (e: any) {
         if (!cancelled) setStatus("Init error: " + (e?.message ?? String(e)));
       }
     })();
-
-    return () => {
-      cancelled = true;
-      // Don't create/destroy contexts repeatedly — only stop if truly leaving the page
-      // We intentionally DO NOT reset here to keep the singleton alive between avatar switches.
-    };
+    return () => { cancelled = true; };
   }, [faceId, agentId]);
 
   async function onConnect() {
-    if (!client) return;
-    setStatus("Starting…");
+    if (!client) { setStatus("Client not ready"); return; }
 
     try {
-      // Route to default output device (if supported)
-      try {
-        await (audioRef.current as any)?.setSinkId?.("default");
-      } catch {}
+      setStatus("Requesting mic…");
+      const mic = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+      });
+      const track = mic.getAudioTracks()[0];
+      if (!track) throw new Error("No mic track");
 
-      // Make sure it's not muted by default
-      if (audioRef.current) audioRef.current.muted = false;
+      // Never route mic to our speakers
+      if (audioRef.current && (audioRef.current as any).srcObject) {
+        (audioRef.current as any).srcObject = null;
+      }
 
-      const start = client.start?.bind(client) || client.connect?.bind(client);
+      // Send mic to Simli (API variants supported)
+      const send =
+        (client.listenToMediastreamTrack && client.listenToMediastreamTrack.bind(client)) ||
+        (client.sendAudioTrack && client.sendAudioTrack.bind(client));
+      if (!send) throw new Error("Simli SDK missing mic method");
+      await send(track);
+
+      setStatus("Starting session…");
+      const start =
+        (client.start && client.start.bind(client)) ||
+        (client.connect && client.connect.bind(client)) ||
+        (client.Start && client.Start.bind(client)) ||
+        (client.Connect && client.Connect.bind(client));
       if (!start) throw new Error("No start/connect on client");
+      await start(); // user gesture
 
-      await start(); // user gesture unlock
-      await audioRef.current?.play().catch(() => {});
-
+      if (audioRef.current) {
+        audioRef.current.muted = false;
+        try { await audioRef.current.play(); } catch {}
+      }
       setConnected(true);
       setStatus("Connected");
     } catch (e: any) {
-      // Surface WebAudio renderer issues clearly
+      console.error("[StageSimli connect]", e);
       setStatus(
-        /AudioContext/i.test(e?.message ?? "")
-          ? "Audio device blocked. See tips below."
-          : "Start failed: " + (e?.message ?? String(e))
+        /NotAllowedError/i.test(e?.name || "") ? "Mic blocked by browser" :
+        /AudioContext/i.test(e?.message || "") ? "Audio device error" :
+        "Start failed: " + (e?.message ?? String(e))
       );
-      console.error("[connect]", e);
     }
   }
 
-  // Optional: if the tab was suspended, resume audio on visibility change
-  useEffect(() => {
-    function onVis() {
-      if (document.visibilityState === "visible") {
-        audioRef.current?.play?.().catch(() => {});
-      }
-    }
-    document.addEventListener("visibilitychange", onVis);
-    return () => document.removeEventListener("visibilitychange", onVis);
-  }, []);
-
   return (
     <div className="relative mx-auto" style={{ width: "min(58vmin, 640px)", height: "min(58vmin, 640px)" }}>
+      {/* Circular crop */}
       <div className="absolute inset-0 rounded-full overflow-hidden bg-black">
-        <video ref={videoRef} autoPlay playsInline className="absolute inset-0 w-full h-full object-cover" style={{ transform: `scale(${scale})` }} />
-        <audio ref={audioRef} autoPlay playsInline controls={false} />
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          className="absolute inset-0 w-full h-full object-cover"
+          style={{ transform: `scale(${scale})` }}
+        />
+        <audio ref={audioRef} autoPlay playsInline />
       </div>
+
+      {/* Halo */}
       <div className="absolute inset-0 rounded-full ring-2 ring-white/85 pointer-events-none" />
 
       {!connected && (
@@ -137,8 +133,7 @@ export default function StageSimli({ faceId, agentId, scale = 0.82 }: Props) {
           {ready ? "Connect" : status}
         </button>
       )}
-
-      {/* Debug line */}
+      {/* tiny debug line */}
       <div className="absolute top-2 left-1/2 -translate-x-1/2 text-[11px] text-white/70">{status}</div>
     </div>
   );
