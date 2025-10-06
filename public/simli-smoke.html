@@ -78,6 +78,10 @@
           audioRef: $audio,
           handleSilence: true,
           enableConsoleLogs: true,
+          // Hints to avoid WebAudio issues (won't break if SDK ignores)
+          preferAudioElement: true,
+          disableWebAudio: true,
+          audioMode: 'element'
         };
         if (agentId) cfg.agentId = agentId;
 
@@ -87,8 +91,16 @@
         // Safety: never route mic to speakers in our code
         try { if ($audio && $audio.srcObject) { $audio.srcObject = null; } } catch {}
 
-        client.on?.("connected", () => setStatus("Connected"));
-        client.on?.("error", (e) => { console.error(e); setStatus("Simli error"); });
+        // Diagnostics
+        client.on?.("connected", () => { console.log("[simli] connected"); setStatus("Connected"); });
+        client.on?.("error", (e) => { console.error("[simli] error event:", e); setStatus("Simli error"); });
+        $audio.addEventListener("error", (ev) => {
+          console.error("[audio] tag error", ev, $audio.error);
+        });
+
+        // Log audio capabilities
+        console.log("mediaCapabilities", navigator.mediaCapabilities ?? "n/a");
+        console.log("Navigator userAgent:", navigator.userAgent);
 
         // scale video to fit the circle
         $video.style.transform = `scale(${isFinite(scale) ? scale : 0.82})`;
@@ -98,10 +110,51 @@
         $btn.onclick = async () => {
           $btn.disabled = true;
           setStatus("Starting…");
+
+          // AudioContext unlock probe (user gesture required)
+          try {
+            const AC = window.AudioContext || window.webkitAudioContext;
+            if (AC) {
+              const ac = new AC();
+              console.log("[audio] AudioContext state:", ac.state);
+              if (ac.state === "suspended") {
+                console.log("[audio] Resuming suspended AudioContext...");
+                await ac.resume();
+              }
+              await ac.close();
+              console.log("[audio] AudioContext unlock probe complete");
+            }
+          } catch (e) {
+            console.warn("[audio] AudioContext unlock probe failed:", e);
+          }
+
+          // Test autoplay policy
+          try {
+            const playTest = await $audio.play();
+            console.log("[audio] autoplay policy check: ok");
+            $audio.pause();
+          } catch (e) {
+            console.log("[audio] autoplay policy check:", e?.name || e);
+          }
+
           const start = client.start?.bind(client) || client.connect?.bind(client);
           if (!start) { setStatus("No start/connect on client"); return; }
-          try { await start(); setStatus("Connected"); }
-          catch (e){ console.error(e); setStatus("Start failed: " + (e?.message || e)); $btn.disabled = false; }
+
+          try {
+            await start();
+            // Nudge audio element to play in case autoplay was blocked
+            try {
+              await $audio.play();
+              console.log("[audio] play() after start: success");
+            } catch (playErr) {
+              console.warn("[audio] play() after start failed:", playErr);
+            }
+            setStatus("Connected");
+          } catch (e) {
+            console.error("[simli] Start failed:", e);
+            setStatus("Start failed: " + (e?.message || e));
+            $btn.disabled = false;
+          }
         };
       } catch (e) {
         console.error(e);
