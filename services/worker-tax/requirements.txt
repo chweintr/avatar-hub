@@ -1,4 +1,4 @@
-livekit-agents==0.10.2
-livekit-plugins-openai==0.6.0
-livekit-plugins-simli==1.2.2
+livekit-agents==1.2.14
+livekit-plugins-openai==1.2.14
+livekit-plugins-simli==1.2.14
 python-dotenv==1.0.1
