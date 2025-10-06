@@ -1,3 +1,4 @@
-pipecat-ai[daily,openai,elevenlabs,simli]
-python-dotenv
-loguru
+livekit-agents==0.10.5
+livekit-plugins-openai==0.6.2
+livekit-plugins-simli==0.1.1
+python-dotenv==1.0.1
