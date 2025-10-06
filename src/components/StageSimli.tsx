@@ -1,80 +1,70 @@
 import { useEffect, useRef, useState } from "react";
+import { getSimliClient } from "../lib/simliClient";
 
 type Props = {
-  scale?: number; // 0.76–0.86 usually
+  faceId: string;
+  agentId?: string;
+  scale?: number;
 };
 
-export default function StageSimli({ scale = 0.82 }: Props) {
+export default function StageSimli({ faceId, agentId, scale = 0.82 }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const [status, setStatus] = useState("Loading…");
   const [ready, setReady] = useState(false);
   const [connected, setConnected] = useState(false);
   const [client, setClient] = useState<any>(null);
-  const mountedRef = useRef(false);
-  const micStreamRef = useRef<MediaStream | null>(null);
-  const unmuteTimer = useRef<number | null>(null);
 
   useEffect(() => {
-    let clientInstance: any = null;
     let cancelled = false;
 
     (async () => {
       try {
-        setStatus("Fetching config…");
+        setStatus("Fetching Simli token…");
         const r = await fetch("/api/simli-config", { cache: "no-store" });
         if (!r.ok) throw new Error("HTTP " + r.status);
-        const { apiKey, faceId, agentId } = await r.json();
-
-        if (!faceId) throw new Error("No faceId from server");
+        const { apiKey } = await r.json();
+        if (!apiKey) throw new Error("No SIMLI_API_KEY");
 
         setStatus("Loading SDK…");
-        const mod = await import("https://cdn.jsdelivr.net/npm/simli-client@1.2.15/+esm");
-        const SimliClient = (mod as any).SimliClient || (mod as any).default;
-        if (!SimliClient) throw new Error("SDK export missing");
+        const c = await getSimliClient();
 
-        setStatus("Creating client…");
-        const c = new SimliClient();
-        clientInstance = c;
+        // Some SDKs expose Initialize vs initialize — support both
+        const initialize =
+          (c.Initialize && c.Initialize.bind(c)) ||
+          (c.initialize && c.initialize.bind(c));
+        if (!initialize) throw new Error("No Initialize/initialize");
 
         const cfg: any = {
           apiKey,
-          faceID: faceId,  // Capital ID as per Simli docs
+          faceID: faceId, faceId,
           videoRef: videoRef.current!,
           audioRef: audioRef.current!,
-          handleSilence: false,  // Required when using listenToMediastreamTrack
+          handleSilence: true,
           enableConsoleLogs: true,
+          // Safe hint: many SDKs will prefer direct <audio> playback
+          preferAudioElement: true, // no-op if unsupported
         };
         if (agentId) cfg.agentId = agentId;
 
-        const init = (c.Initialize && c.Initialize.bind(c)) || (c.initialize && c.initialize.bind(c));
-        if (!init) throw new Error("No Initialize/initialize");
-
         setStatus("Initializing…");
-        await init(cfg);
+        await initialize(cfg);
         if (cancelled) return;
 
-        // Avatar events
-        c.on?.("connected", () => {
-          console.log("Simli WebRTC connected");
-        });
-
         c.on?.("error", (e: any) => {
-          console.error(e);
+          console.error("[simli] error", e);
           setStatus("Simli error");
         });
-
-        c.on?.("speaking", () => {
-          if (audioRef.current) audioRef.current.muted = false;
-          if (unmuteTimer.current) {
-            window.clearTimeout(unmuteTimer.current);
-            unmuteTimer.current = null;
-          }
+        c.on?.("connected", () => {
+          setConnected(true);
+          setStatus("Connected");
+          // Nudge the HTMLAudioElement in case autoplay was paused
+          audioRef.current?.play?.().catch(() => {});
         });
 
         setClient(c);
         setReady(true);
-        setStatus("Ready");
+        setStatus("Ready. Click Connect.");
       } catch (e: any) {
         if (!cancelled) setStatus("Init error: " + (e?.message ?? String(e)));
       }
@@ -82,97 +72,61 @@ export default function StageSimli({ scale = 0.82 }: Props) {
 
     return () => {
       cancelled = true;
-      // Cleanup mic stream
-      if (micStreamRef.current) {
-        micStreamRef.current.getTracks().forEach(t => t.stop());
-        micStreamRef.current = null;
-      }
-      // Cleanup Simli client
-      if (clientInstance) {
-        try {
-          clientInstance.stop?.();
-          clientInstance.disconnect?.();
-          clientInstance.close?.();
-        } catch (e) {
-          console.error("Cleanup error:", e);
-        }
-      }
+      // Don't create/destroy contexts repeatedly — only stop if truly leaving the page
+      // We intentionally DO NOT reset here to keep the singleton alive between avatar switches.
     };
-  }, []);
+  }, [faceId, agentId]);
 
   async function onConnect() {
     if (!client) return;
+    setStatus("Starting…");
 
     try {
-      // 1) Start the session FIRST
-      setStatus("Connecting…");
+      // Route to default output device (if supported)
+      try {
+        await (audioRef.current as any)?.setSinkId?.("default");
+      } catch {}
+
+      // Make sure it's not muted by default
+      if (audioRef.current) audioRef.current.muted = false;
+
       const start = client.start?.bind(client) || client.connect?.bind(client);
-      if (!start) {
-        setStatus("No start/connect on client");
-        return;
-      }
-      await start();
+      if (!start) throw new Error("No start/connect on client");
 
-      // 2) Now request mic and send ONLY to Simli (never to any local output)
-      setStatus("Requesting mic…");
-      const mic = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
-      });
-      micStreamRef.current = mic;
-      const track = mic.getAudioTracks()[0];
-
-      // hard guard: NEVER route mic to local output
-      if (audioRef.current?.srcObject === mic) audioRef.current.srcObject = null;
-      if (videoRef.current?.srcObject === mic) videoRef.current.srcObject = null;
-
-      // Give Simli the mic track (one way → Simli)
-      if (track && client.listenToMediastreamTrack) {
-        await client.listenToMediastreamTrack(track);
-      } else if (track && client.sendAudioTrack) {
-        await client.sendAudioTrack(track);
-      }
-
-      // Mute output until avatar actually speaks (avoid any loopback artifact)
-      if (audioRef.current) {
-        audioRef.current.muted = true;
-        if (unmuteTimer.current) window.clearTimeout(unmuteTimer.current);
-        unmuteTimer.current = window.setTimeout(() => {
-          if (audioRef.current) audioRef.current.muted = false;
-          unmuteTimer.current = null;
-        }, 1200); // fail-safe if 'speaking' event never fires
-      }
+      await start(); // user gesture unlock
+      await audioRef.current?.play().catch(() => {});
 
       setConnected(true);
       setStatus("Connected");
     } catch (e: any) {
-      console.error(e);
-      setStatus((e?.name === "NotAllowedError")
-        ? "Mic blocked by browser"
-        : "Error: " + (e?.message ?? String(e)));
+      // Surface WebAudio renderer issues clearly
+      setStatus(
+        /AudioContext/i.test(e?.message ?? "")
+          ? "Audio device blocked. See tips below."
+          : "Start failed: " + (e?.message ?? String(e))
+      );
+      console.error("[connect]", e);
     }
   }
 
+  // Optional: if the tab was suspended, resume audio on visibility change
+  useEffect(() => {
+    function onVis() {
+      if (document.visibilityState === "visible") {
+        audioRef.current?.play?.().catch(() => {});
+      }
+    }
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, []);
+
   return (
     <div className="relative mx-auto" style={{ width: "min(58vmin, 640px)", height: "min(58vmin, 640px)" }}>
-      {/* Circular crop */}
       <div className="absolute inset-0 rounded-full overflow-hidden bg-black">
-        <video
-          ref={videoRef}
-          autoPlay
-          playsInline
-          muted
-          className="absolute inset-0 w-full h-full object-cover"
-          style={{ transform: `scale(${scale})` }}
-        />
-        <audio ref={audioRef} autoPlay playsInline />
-        {/* tiny status overlay for debugging; remove later */}
-        <div className="absolute inset-x-0 bottom-2 text-center text-[11px] text-white/75 pointer-events-none">
-          {connected ? "" : status}
-        </div>
+        <video ref={videoRef} autoPlay playsInline className="absolute inset-0 w-full h-full object-cover" style={{ transform: `scale(${scale})` }} />
+        <audio ref={audioRef} autoPlay playsInline controls={false} />
       </div>
-
-      {/* Ring/frame */}
-      <div className="absolute inset-0 rounded-full ring-2 ring-white/85 shadow-[0_40px_120px_rgba(0,0,0,0.15)] pointer-events-none" />
+      <div className="absolute inset-0 rounded-full ring-2 ring-white/85 pointer-events-none" />
 
       {!connected && (
         <button
@@ -183,6 +137,9 @@ export default function StageSimli({ scale = 0.82 }: Props) {
           {ready ? "Connect" : status}
         </button>
       )}
+
+      {/* Debug line */}
+      <div className="absolute top-2 left-1/2 -translate-x-1/2 text-[11px] text-white/70">{status}</div>
     </div>
   );
 }
