@@ -5,6 +5,7 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import fs from 'fs';
 import { AccessToken } from 'livekit-server-sdk';
+import { dailyBotConnect } from './api/dailybot-connect.js';
 
 dotenv.config();
 
@@ -56,6 +57,9 @@ app.get('/api/simli-config', (req, res) => {
 
   res.json({ apiKey, faceId, agentId });
 });
+
+// Daily Bot connect endpoint
+app.post('/api/dailybot/connect', dailyBotConnect);
 
 // LiveKit token endpoint
 app.get('/api/livekit-token', async (req, res) => {

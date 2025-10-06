@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import StageLiveKit from "../components/StageLiveKit";
-import StageSimli from "../components/StageSimli";
+import StageDailyBot from "../components/StageDailyBot";
 import { Dock } from "../components/Dock";
 import { AVATARS } from "../config/avatars";
 import NavBar from "../components/NavBar";
@@ -27,8 +27,26 @@ export default function AppLanding() {
         {/* Stage area */}
         <section className="mt-10 flex justify-center">
           {active ? (
-            active.useSimli ? (
-              <StageSimli scale={active.scale} />
+            active.useDailyBot ? (
+              <StageDailyBot
+                faceId={active.id}
+                scale={active.scale}
+                config={active.systemPrompt ? [
+                  {
+                    service: "tts",
+                    options: [{ name: "voice", value: active.voice || "79a125e8-cd45-4c13-8a67-188112f4dd22" }]
+                  },
+                  {
+                    service: "llm",
+                    options: [
+                      { name: "initial_messages", value: [{
+                        role: "user",
+                        content: [{ type: "text", text: active.systemPrompt }]
+                      }]}
+                    ]
+                  }
+                ] : []}
+              />
             ) : (
               <StageLiveKit roomName={active.room} />
             )

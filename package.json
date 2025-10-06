@@ -32,6 +32,9 @@
     "livekit-server-sdk": "^2.14.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
+    "realtime-ai": "^0.2.3",
+    "realtime-ai-daily": "^0.2.0",
+    "realtime-ai-react": "^0.2.2",
     "simli-client": "^1.2.15",
     "tsx": "^4.20.6"
   },
