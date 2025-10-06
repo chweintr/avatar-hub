@@ -69,7 +69,7 @@ app.get('/api/livekit-token', async (req, res) => {
   const user = String(req.query.user || `viewer-${Math.random().toString(36).slice(2)}`);
 
   const at = new AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET, { identity: user });
-  at.addGrant({ roomJoin: true, room, canPublish: false, canSubscribe: true });
+  at.addGrant({ roomJoin: true, room, canPublish: true, canSubscribe: true });
 
   const token = await at.toJwt();
   res.json({ url: LIVEKIT_URL, token });
