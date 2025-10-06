@@ -17,7 +17,7 @@ export default function StageLiveKit({ roomName }: { roomName: string }) {
       setStatus("Connecting");
       const me = crypto.randomUUID();
       const apiBase = import.meta.env.VITE_API_BASE || '';
-      const resp = await fetch(`${apiBase}/api/livekit-token?room=${encodeURIComponent(roomName)}&user=${me}`);
+      const resp = await fetch(`${apiBase}/api/livekit-token?room=avatar-tax&user=${me}`);
       if (!resp.ok) throw new Error("token http " + resp.status);
       const { url, token } = await resp.json();
 
