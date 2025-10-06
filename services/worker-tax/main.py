@@ -1,65 +1,47 @@
-import os
-import asyncio
 import logging
-from livekit import rtc, api as lk_api
-from livekit.agents import Agent, AgentSession
+import os
+from livekit.agents import Agent, AgentSession, JobContext, WorkerOptions, WorkerType, cli
 from livekit.plugins import openai, simli
 
 logging.basicConfig(level=logging.INFO)
 
 
-async def main():
+async def entrypoint(ctx: JobContext):
     """Tax Advisor Avatar - LiveKit + OpenAI Realtime + Simli
 
-    Self-join worker: connects to LiveKit room and publishes avatar A/V
+    Flow: User mic → OpenAI Realtime (STT+LLM+TTS) → Simli (lip-sync) → User sees/hears avatar
     """
-    url = os.environ["LIVEKIT_URL"]
-    room_name = os.getenv("LIVEKIT_ROOM", "avatar-tax")
 
-    # Create access token for worker
-    at = lk_api.AccessToken(
-        os.environ["LIVEKIT_API_KEY"],
-        os.environ["LIVEKIT_API_SECRET"],
-        identity=f"{room_name}-simli-worker",
-        name="Simli Worker"
-    )
-    at.add_grant(lk_api.VideoGrant(
-        room_join=True,
-        room=room_name,
-        can_publish=True,
-        can_subscribe=True
-    ))
-    token = at.to_jwt()
-
-    # Connect to room
-    room = rtc.Room()
-    await room.connect(url, token)
-    logging.info(f"Joined LiveKit room: {room_name}")
-
-    # OpenAI Realtime session
+    # OpenAI Realtime: handles STT + LLM + TTS in one session
     session = AgentSession(
-        llm=openai.realtime.RealtimeModel(voice="alloy")
-    )
-
-    # Simli avatar
-    avatar = simli.AvatarSession(
-        simli.SimliConfig(
-            api_key=os.environ["SIMLI_API_KEY"],
-            face_id=os.environ["SIMLI_FACE_ID"],
-            agent_id=os.getenv("SIMLI_AGENT_ID") or None,
+        llm=openai.realtime.RealtimeModel(
+            voice="alloy",
+            instructions="You are a knowledgeable tax advisor specializing in helping artists, creatives, and freelancers. Provide clear, practical tax advice. Be conversational and friendly. Keep responses concise (2-3 sentences) unless asked for details.",
         )
     )
 
-    # Start avatar and session
-    await avatar.start(session, room=room)
-    await session.start(
-        agent=Agent(instructions="Tax advisor for artists. Be concise and practical."),
-        room=room
+    # Simli avatar: receives ONLY the agent's synthesized audio for lip-sync
+    simli_avatar = simli.AvatarSession(
+        simli_config=simli.SimliConfig(
+            api_key=os.environ["SIMLI_API_KEY"],
+            face_id=os.environ["SIMLI_FACE_ID"],
+        ),
     )
 
-    # Keep running
-    await asyncio.Event().wait()
+    # Start Simli avatar with the agent session
+    await simli_avatar.start(session, room=ctx.room)
+
+    # Start the agent session in the room
+    await session.start(
+        agent=Agent(),
+        room=ctx.room,
+    )
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    cli.run_app(
+        WorkerOptions(
+            entrypoint_fnc=entrypoint,
+            worker_type=WorkerType.ROOM
+        )
+    )
