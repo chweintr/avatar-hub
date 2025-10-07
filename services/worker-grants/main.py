@@ -1,10 +1,10 @@
 import logging
 import os
 import httpx
-from typing import Optional
 from dotenv import load_dotenv
-from livekit.agents import Agent, AgentSession, JobContext, WorkerOptions, WorkerType, cli, llm
-from livekit.plugins import openai, elevenlabs, simli
+from livekit.agents import Agent, AgentSession, JobContext, WorkerOptions, WorkerType, cli, RunContext
+from livekit.agents.llm import function_tool
+from livekit.plugins import openai, deepgram, silero, simli
 
 logger = logging.getLogger("grants-advisor-agent")
 logger.setLevel(logging.INFO)
@@ -34,16 +34,66 @@ class GrantsKnowledgeBase:
             return "I'm having trouble accessing my knowledge base right now. Please try again."
 
 
+# Global knowledge base instance
+knowledge_base = None
+
+
+class GrantsAgent(Agent):
+    """Grant/Residency Expert Agent with RAG capabilities"""
+
+    def __init__(self):
+        super().__init__(
+            instructions="""You are an expert advisor on art grants, residencies, and funding opportunities for artists.
+
+Your role is to help artists find and apply for relevant opportunities by searching a comprehensive database.
+
+When a user asks about grants, residencies, or funding:
+1. Use the search_art_grants function to find relevant opportunities
+2. Summarize the most relevant results clearly and concisely
+3. Highlight key information like deadlines, eligibility, funding amounts, and locations
+4. Always encourage artists and provide actionable next steps
+
+Be warm, supportive, and specific. Mention actual grant names and organizations when available.
+Keep initial responses to 2-3 sentences, but offer more details if asked."""
+        )
+
+    @function_tool
+    async def search_art_grants(
+        self,
+        context: RunContext,
+        query: str,
+    ) -> str:
+        """Search the art grants and residencies knowledge base for relevant opportunities.
+        Use this function whenever the user asks about grants, residencies, funding, or opportunities.
+
+        Args:
+            query: The search query based on user's question (e.g., "residencies in New York", "sculpture grants")
+        """
+        logger.info(f"Searching grants with query: {query}")
+
+        if knowledge_base:
+            result = await knowledge_base.search_grants(query, num_results=5)
+            logger.info(f"Search result: {result[:200]}...")
+            return result
+        else:
+            return "Knowledge base not initialized. Please try again."
+
+
 async def entrypoint(ctx: JobContext):
-    """Grant/Residency Expert Avatar - with LiveKit + OpenAI Realtime + Simli
+    """Grant/Residency Expert Avatar - RAG-powered with Deepgram STT + OpenAI LLM + Simli"""
 
-    Using simple instructions for now - RAG integration will come later
-    """
+    global knowledge_base
 
-    # Use OpenAI Realtime (has built-in STT + LLM + TTS)
-    # This is the official Simli pattern - works reliably
+    # Initialize RAG backend connection
+    rag_url = os.getenv("RAG_BACKEND_URL", "http://localhost:8000")
+    knowledge_base = GrantsKnowledgeBase(rag_url)
+
+    # Use Deepgram STT + OpenAI LLM + OpenAI TTS (supports function calling!)
     session = AgentSession(
-        llm=openai.realtime.RealtimeModel(voice="nova"),
+        vad=silero.VAD.load(),
+        stt=deepgram.STT(model="nova-2"),
+        llm=openai.LLM(model="gpt-4o"),
+        tts=openai.TTS(voice="nova"),
     )
 
     # Simli avatar configuration
@@ -58,29 +108,9 @@ async def entrypoint(ctx: JobContext):
     await avatar.start(session, room=ctx.room)
     logger.info("Simli avatar started")
 
-    # Grant/residency expert instructions
-    instructions = """You are an expert advisor on art grants, residencies, and funding opportunities for artists.
-
-Your role is to help artists find and apply for relevant opportunities by searching a comprehensive database.
-
-When a user asks about grants, residencies, or funding:
-1. Use the search_art_grants function to find relevant opportunities
-2. Summarize the most relevant results clearly and concisely
-3. Highlight key information like deadlines, eligibility, funding amounts, and locations
-4. Always encourage artists and provide actionable next steps
-
-Be warm, supportive, and specific. Mention actual grant names and organizations when available.
-Keep initial responses to 2-3 sentences, but offer more details if asked.
-
-Examples:
-- "What grants are available in New York?" → Search for location-based grants
-- "I need funding for a sculpture project" → Search for sculpture grants
-- "Tell me about residencies with housing" → Search for residencies with accommodation
-"""
-
-    # Start the agent session
+    # Start the agent session with GrantsAgent (has function tools)
     await session.start(
-        agent=Agent(instructions=instructions),
+        agent=GrantsAgent(),
         room=ctx.room,
     )
     logger.info("Agent session started with RAG-powered grants search")
