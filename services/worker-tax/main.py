@@ -2,7 +2,7 @@ import logging
 import os
 from dotenv import load_dotenv
 from livekit.agents import Agent, AgentSession, JobContext, WorkerOptions, WorkerType, cli
-from livekit.plugins import openai, elevenlabs, simli
+from livekit.plugins import openai, simli
 
 logger = logging.getLogger("tax-advisor-agent")
 logger.setLevel(logging.INFO)
@@ -11,7 +11,7 @@ load_dotenv()
 
 
 async def entrypoint(ctx: JobContext):
-    """Tax Advisor Avatar - LiveKit + OpenAI + ElevenLabs + Simli
+    """Tax Advisor Avatar - LiveKit + OpenAI Realtime + Simli
 
     Per official Simli docs: https://docs.livekit.io/agents/plugins/simli/
     The plugin handles avatar participant creation and A/V publishing automatically.
@@ -19,25 +19,9 @@ async def entrypoint(ctx: JobContext):
 
     await ctx.connect()
 
-    # Debug: Check ElevenLabs environment variables
-    voice_id = os.getenv("ELEVENLABS_VOICE_ID")
-    api_key = os.getenv("ELEVEN_API_KEY")
-
-    logger.info(f"ELEVENLABS_VOICE_ID present: {voice_id is not None}")
-    logger.info(f"ELEVEN_API_KEY present: {api_key is not None}")
-
-    if not voice_id:
-        raise ValueError("ELEVENLABS_VOICE_ID environment variable is required")
-    if not api_key:
-        raise ValueError("ELEVEN_API_KEY environment variable is required")
-
-    # Use ElevenLabs for TTS
+    # OpenAI Realtime handles STT + LLM + TTS
     session = AgentSession(
-        llm=openai.LLM(model="gpt-4o-mini"),
-        tts=elevenlabs.TTS(
-            voice_id=voice_id,
-            api_key=api_key
-        ),
+        llm=openai.realtime.RealtimeModel(voice="alloy"),
     )
 
     # Simli avatar configuration
