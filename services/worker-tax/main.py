@@ -19,14 +19,11 @@ async def entrypoint(ctx: JobContext):
 
     await ctx.connect()
 
-    # Use OpenAI LLM with ElevenLabs TTS for custom voice
+    # Use OpenAI LLM with OpenAI TTS (ElevenLabs temporarily disabled)
+    # TODO: Debug ElevenLabs integration - may need STT configuration
     session = AgentSession(
         llm=openai.LLM(model="gpt-4o"),  # Full gpt-4o for better numeracy
-        tts=elevenlabs.TTS(
-            voice_id=os.getenv("ELEVENLABS_VOICE_ID", "NaKPQmdr7mMxXuXrNeFC"),
-            api_key=os.getenv("ELEVEN_API_KEY"),
-            model="eleven_turbo_v2_5"
-        ),
+        tts=openai.TTS(voice="shimmer"),  # Warm female voice
     )
 
     # Simli avatar configuration

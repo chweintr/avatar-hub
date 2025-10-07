@@ -69,14 +69,11 @@ async def entrypoint(ctx: JobContext):
     func_ctx = llm.FunctionContext()
     func_ctx.ai_callable(search_art_grants)
 
-    # Use OpenAI LLM with ElevenLabs TTS
+    # Use OpenAI LLM with OpenAI TTS (ElevenLabs temporarily disabled)
+    # TODO: Debug ElevenLabs integration - may need STT configuration
     session = AgentSession(
         llm=openai.LLM(model="gpt-4o"),
-        tts=elevenlabs.TTS(
-            voice_id=os.getenv("ELEVENLABS_VOICE_ID", "OYTbf65OHHFELVut7v2H"),
-            api_key=os.getenv("ELEVEN_API_KEY"),
-            model="eleven_turbo_v2_5"
-        ),
+        tts=openai.TTS(voice="nova"),  # Warm, friendly voice
         functions=[func_ctx],
     )
 
