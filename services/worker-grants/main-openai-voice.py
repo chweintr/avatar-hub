@@ -4,7 +4,7 @@ import httpx
 from typing import Optional
 from dotenv import load_dotenv
 from livekit.agents import Agent, AgentSession, JobContext, WorkerOptions, WorkerType, cli, llm
-from livekit.plugins import openai, elevenlabs, simli
+from livekit.plugins import openai, simli
 
 logger = logging.getLogger("grants-advisor-agent")
 logger.setLevel(logging.INFO)
@@ -35,9 +35,10 @@ class GrantsKnowledgeBase:
 
 
 async def entrypoint(ctx: JobContext):
-    """Grant/Residency Expert Avatar - RAG-powered with LiveKit + ElevenLabs + Simli
+    """Grant/Residency Expert Avatar - FALLBACK VERSION with OpenAI voices
 
-    This agent uses the RAG backend to search a database of art grants and residencies
+    Use this version if ElevenLabs integration has issues.
+    Simply rename this file to main.py to use it.
     """
 
     await ctx.connect()
@@ -69,14 +70,11 @@ async def entrypoint(ctx: JobContext):
     func_ctx = llm.FunctionContext()
     func_ctx.ai_callable(search_art_grants)
 
-    # Use OpenAI LLM with ElevenLabs TTS
+    # Use OpenAI LLM with OpenAI TTS (fallback)
+    # Available voices: alloy, echo, fable, onyx, nova, shimmer
     session = AgentSession(
         llm=openai.LLM(model="gpt-4o"),
-        tts=elevenlabs.TTS(
-            voice_id=os.getenv("ELEVENLABS_VOICE_ID", "OYTbf65OHHFELVut7v2H"),
-            api_key=os.getenv("ELEVEN_API_KEY"),
-            model="eleven_turbo_v2_5"
-        ),
+        tts=openai.TTS(voice="nova"),  # nova = warm, friendly voice
         functions=[func_ctx],
     )
 
@@ -117,7 +115,7 @@ Examples:
         agent=Agent(instructions=instructions),
         room=ctx.room,
     )
-    logger.info("Agent session started with RAG-powered grants search")
+    logger.info("Agent session started with RAG-powered grants search (OpenAI TTS fallback)")
 
 
 if __name__ == "__main__":
