@@ -82,6 +82,29 @@ export default function StageSimli({ faceId, agentId, scale = 0.82 }: Props) {
       const track = mic.getAudioTracks()[0];
       if (!track) throw new Error("No mic track");
 
+      console.log("[simli] mic track:", {
+        id: track.id,
+        label: track.label,
+        enabled: track.enabled,
+        muted: track.muted,
+        readyState: track.readyState
+      });
+
+      // Test mic levels
+      const audioContext = new AudioContext();
+      const source = audioContext.createMediaStreamSource(mic);
+      const analyser = audioContext.createAnalyser();
+      source.connect(analyser);
+      analyser.fftSize = 256;
+      const dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+      const checkLevel = () => {
+        analyser.getByteFrequencyData(dataArray);
+        const avg = dataArray.reduce((a, b) => a + b) / dataArray.length;
+        if (avg > 10) console.log("[simli] mic level:", Math.round(avg));
+      };
+      setInterval(checkLevel, 500);
+
       // hard guard: never route mic to speakers
       if (audioRef.current && (audioRef.current as any).srcObject) {
         (audioRef.current as any).srcObject = null;
@@ -92,8 +115,9 @@ export default function StageSimli({ faceId, agentId, scale = 0.82 }: Props) {
         client.sendAudioTrack?.bind(client);
       if (!send) throw new Error("SDK missing mic method");
 
-      console.log("[simli] send mic track");
+      console.log("[simli] send mic track, method:", send.name || 'anonymous');
       await send(track);
+      console.log("[simli] mic track sent successfully");
 
       if (audioRef.current) {
         audioRef.current.muted = false;
