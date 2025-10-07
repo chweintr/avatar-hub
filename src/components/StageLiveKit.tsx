@@ -55,10 +55,20 @@ export default function StageLiveKit({
       setStatus("Joining…");
       await lkRoom.connect(url, token);
 
-      // Enable microphone (you speak to the agent) - user gesture required
-      console.log("[livekit] enabling microphone...");
-      await lkRoom.localParticipant.setMicrophoneEnabled(true);
-      console.log("[livekit] microphone enabled");
+      // Explicitly request and enable microphone with constraints
+      console.log("[livekit] requesting microphone access...");
+      try {
+        await lkRoom.localParticipant.setMicrophoneEnabled(true, {
+          autoGainControl: true,
+          echoCancellation: true,
+          noiseSuppression: true,
+        });
+        console.log("[livekit] microphone enabled with audio processing");
+      } catch (err) {
+        console.error("[livekit] microphone error:", err);
+        setStatus("Mic error: " + (err instanceof Error ? err.message : String(err)));
+        return;
+      }
 
       // Disable camera (visuals come from Simli avatar)
       await lkRoom.localParticipant.setCameraEnabled(false);
