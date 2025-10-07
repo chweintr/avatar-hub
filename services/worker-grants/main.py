@@ -92,16 +92,16 @@ async def entrypoint(ctx: JobContext):
     # Using OpenAI for everything - simpler, one API key
     session = AgentSession(
         vad=silero.VAD.load(),
-        stt=openai.STT(),  # OpenAI Whisper (no extra API key needed!)
+        stt=openai.STT(language="en"),  # Force English!
         llm=openai.LLM(model="gpt-4o"),
         tts=openai.TTS(voice="nova"),
     )
 
-    # Simli avatar configuration
+    # Simli avatar configuration - use GRANTS specific face ID
     avatar = simli.AvatarSession(
         simli_config=simli.SimliConfig(
             api_key=os.getenv("SIMLI_API_KEY"),
-            face_id=os.getenv("SIMLI_FACE_ID"),
+            face_id=os.getenv("SIMLI_GRANTS_FACE_ID") or os.getenv("SIMLI_FACE_ID"),  # Fallback to generic
         ),
     )
 

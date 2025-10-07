@@ -23,11 +23,11 @@ async def entrypoint(ctx: JobContext):
         llm=openai.realtime.RealtimeModel(voice="shimmer"),
     )
 
-    # Simli avatar configuration
+    # Simli avatar configuration - use TAX specific face ID
     avatar = simli.AvatarSession(
         simli_config=simli.SimliConfig(
             api_key=os.getenv("SIMLI_API_KEY"),
-            face_id=os.getenv("SIMLI_FACE_ID"),
+            face_id=os.getenv("SIMLI_TAX_FACE_ID") or os.getenv("SIMLI_FACE_ID"),  # Fallback to generic
         ),
     )
 
