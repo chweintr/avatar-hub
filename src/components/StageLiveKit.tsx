@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { Room, RoomEvent, RemoteTrackPublication } from "livekit-client";
+import { Room, RoomEvent, RemoteTrackPublication, RemoteVideoTrack, RemoteAudioTrack } from "livekit-client";
 
 export default function StageLiveKit({ roomName }: { roomName: string }) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
   const [status, setStatus] = useState("Idle");
   const [room, setRoom] = useState<Room | null>(null);
 
@@ -18,23 +19,53 @@ export default function StageLiveKit({ roomName }: { roomName: string }) {
 
       const lkRoom = new Room({ adaptiveStream: true, dynacast: true });
 
-      // Subscribe to avatar's video track
-      lkRoom.on(RoomEvent.TrackSubscribed, (_track, pub: RemoteTrackPublication, participant) => {
+      // Attach tracks as they're subscribed
+      lkRoom.on(RoomEvent.TrackSubscribed, (track, pub: RemoteTrackPublication, participant) => {
         console.log("[livekit] track subscribed:", pub.kind, "from", participant.identity);
         if (pub.kind === "video" && videoRef.current) {
-          pub.videoTrack?.attach(videoRef.current);
+          (track as RemoteVideoTrack).attach(videoRef.current);
           setStatus(`Watching ${participant.name || participant.identity}`);
+        }
+        if (pub.kind === "audio" && audioRef.current) {
+          (track as RemoteAudioTrack).attach(audioRef.current);
+          console.log("[livekit] audio track attached");
+        }
+      });
+
+      lkRoom.on(RoomEvent.TrackUnsubscribed, (track, pub: RemoteTrackPublication) => {
+        if (pub.kind === "video" && videoRef.current) {
+          (track as RemoteVideoTrack).detach(videoRef.current);
+        }
+        if (pub.kind === "audio" && audioRef.current) {
+          (track as RemoteAudioTrack).detach(audioRef.current);
         }
       });
 
       setStatus("Joining…");
       await lkRoom.connect(url, token);
 
+      // Enable microphone (you speak to the agent) - user gesture required
+      console.log("[livekit] enabling microphone...");
+      await lkRoom.localParticipant.setMicrophoneEnabled(true);
+      console.log("[livekit] microphone enabled");
+
       // Disable camera (visuals come from Simli avatar)
       await lkRoom.localParticipant.setCameraEnabled(false);
 
-      // Enable microphone (you speak to the agent)
-      await lkRoom.localParticipant.setMicrophoneEnabled(true);
+      // Attach any existing tracks (in case avatar joined before us)
+      lkRoom.remoteParticipants.forEach(p => {
+        p.trackPublications.forEach((pub: RemoteTrackPublication) => {
+          if (pub.isSubscribed && pub.track) {
+            if (pub.kind === "video" && videoRef.current) {
+              (pub.track as RemoteVideoTrack).attach(videoRef.current);
+            }
+            if (pub.kind === "audio" && audioRef.current) {
+              (pub.track as RemoteAudioTrack).attach(audioRef.current);
+              console.log("[livekit] existing audio track attached");
+            }
+          }
+        });
+      });
 
       setRoom(lkRoom);
       setStatus("Connected");
@@ -49,6 +80,7 @@ export default function StageLiveKit({ roomName }: { roomName: string }) {
     <div className="relative mx-auto" style={{ width: "min(58vmin, 640px)", height: "min(58vmin, 640px)" }}>
       <div className="absolute inset-0 rounded-full overflow-hidden bg-black">
         <video ref={videoRef} autoPlay playsInline className="absolute inset-0 w-full h-full object-cover" />
+        <audio ref={audioRef} autoPlay playsInline muted={false} />
       </div>
       <div className="absolute inset-0 rounded-full ring-2 ring-white/85 pointer-events-none" />
       <button
