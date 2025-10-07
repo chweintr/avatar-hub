@@ -5,7 +5,7 @@ type Props = { faceId: string; agentId?: string; scale?: number };
 export default function StageSimli({ faceId, agentId, scale = 0.82 }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
-  const [status, setStatus] = useState("Loading…");
+  const [status, setStatus] = useState("Booting…");
   const [ready, setReady] = useState(false);
   const [connected, setConnected] = useState(false);
   const [client, setClient] = useState<any>(null);
@@ -14,78 +14,66 @@ export default function StageSimli({ faceId, agentId, scale = 0.82 }: Props) {
     let cancelled = false;
     (async () => {
       try {
+        console.log("[simli] fetch key");
         setStatus("Fetching key…");
         const r = await fetch("/api/simli-config", { cache: "no-store" });
         if (!r.ok) throw new Error("HTTP " + r.status);
         const { apiKey } = await r.json();
+        if (!apiKey) throw new Error("SIMLI_API_KEY missing");
 
-        const SimliCtor =
-          (window as any).SimliClient?.SimliClient ||
-          (window as any).SimliClient?.default ||
-          (window as any).SimliClient;
-        if (!SimliCtor) throw new Error("Simli UMD not found");
+        console.log("[simli] import sdk");
+        setStatus("Loading SDK…");
+        const mod: any = await import("https://cdn.jsdelivr.net/npm/simli-client@1.2.15/+esm");
+        const SimliCtor = mod?.SimliClient ?? mod?.default;
+        if (typeof SimliCtor !== "function") throw new Error("Bad SDK export");
 
-        const c = new (SimliCtor as any)();
-        const init = c.Initialize?.bind(c) || c.initialize?.bind(c);
+        console.log("[simli] create client");
+        const c = new SimliCtor();
+
+        const init = c.Initialize?.bind(c) ?? c.initialize?.bind(c);
         if (!init) throw new Error("No Initialize/initialize");
 
+        console.log("[simli] initialize");
         await init({
           apiKey,
           faceID: faceId, faceId,
           ...(agentId ? { agentId } : {}),
           videoRef: videoRef.current!,
           audioRef: audioRef.current!,
-          handleSilence: false,          // using listenToMediastreamTrack → set false (per docs)
+          handleSilence: false,        // we'll attach mic after start()
           enableConsoleLogs: true,
         });
 
-        c.on?.("error", (e: any) => {
-          console.error("[simli] error", e);
-          setStatus("Simli error");
-        });
-        c.on?.("connected", () => {
-          console.log("[simli] connected event fired");
-          setConnected(true);
-          setStatus("Connected");
-          audioRef.current?.play?.().catch(() => {});
-        });
-
-        // Check video metadata
-        if (videoRef.current) {
-          videoRef.current.onloadedmetadata = () => {
-            console.log("[simli] video metadata loaded:", {
-              width: videoRef.current?.videoWidth,
-              height: videoRef.current?.videoHeight,
-              srcObject: videoRef.current?.srcObject
-            });
-          };
-          videoRef.current.onplay = () => {
-            console.log("[simli] video playing");
-          };
-        }
+        c.on?.("error", (e: any) => { console.error("[simli] error", e); setStatus("Simli error"); });
+        c.on?.("connected", () => { console.log("[simli] connected"); setConnected(true); setStatus("Connected"); });
 
         setClient(c);
         setReady(true);
         setStatus("Ready");
+        console.log("[simli] ready");
       } catch (e: any) {
-        if (!cancelled) setStatus("Init error: " + (e?.message ?? String(e)));
+        if (!cancelled) { console.error("[simli] init error", e); setStatus("Init error: " + (e?.message ?? String(e))); }
       }
     })();
     return () => { cancelled = true; };
   }, [faceId, agentId]);
 
   async function onConnect() {
+    console.log("[simli] connect click");
     if (!client) { setStatus("Client not ready"); return; }
 
     try {
       setStatus("Starting session…");
       const start =
-        (client.start && client.start.bind(client)) ||
-        (client.connect && client.connect.bind(client)) ||
-        (client.Start && client.Start.bind(client)) ||
-        (client.Connect && client.Connect.bind(client));
+        client.start?.bind(client) ??
+        client.connect?.bind(client) ??
+        client.Start?.bind(client) ??
+        client.Connect?.bind(client);
       if (!start) throw new Error("No start/connect on client");
-      await start(); // per Simli docs: start the WebRTC session first
+
+      console.log("[simli] start()");
+      await start();  // start session first (prevents 'Session not initialized')
+      console.log("[simli] start() done");
 
       setStatus("Requesting mic…");
       const mic = await navigator.mediaDevices.getUserMedia({
@@ -94,30 +82,31 @@ export default function StageSimli({ faceId, agentId, scale = 0.82 }: Props) {
       const track = mic.getAudioTracks()[0];
       if (!track) throw new Error("No mic track");
 
-      // NEVER route mic to speakers
+      // hard guard: never route mic to speakers
       if (audioRef.current && (audioRef.current as any).srcObject) {
         (audioRef.current as any).srcObject = null;
       }
 
-      // Send mic to Simli after start()
       const send =
-        (client.listenToMediastreamTrack && client.listenToMediastreamTrack.bind(client)) ||
-        (client.sendAudioTrack && client.sendAudioTrack.bind(client));
-      if (!send) throw new Error("Simli SDK missing mic method");
+        client.listenToMediastreamTrack?.bind(client) ??
+        client.sendAudioTrack?.bind(client);
+      if (!send) throw new Error("SDK missing mic method");
+
+      console.log("[simli] send mic track");
       await send(track);
 
       if (audioRef.current) {
         audioRef.current.muted = false;
-        try { await audioRef.current.play(); } catch {}
+        await audioRef.current.play().catch(() => {});
       }
 
       setConnected(true);
       setStatus("Connected");
+      console.log("[simli] connected/playing");
     } catch (e: any) {
-      console.error("[StageSimli connect]", e);
+      console.error("[simli] connect error", e);
       setStatus(
         /NotAllowedError/i.test(e?.name || "") ? "Mic blocked by browser" :
-        /AudioContext/i.test(e?.message || "") ? "Audio device error" :
         "Start failed: " + (e?.message ?? String(e))
       );
     }
@@ -125,7 +114,6 @@ export default function StageSimli({ faceId, agentId, scale = 0.82 }: Props) {
 
   return (
     <div className="relative mx-auto" style={{ width: "min(58vmin, 640px)", height: "min(58vmin, 640px)" }}>
-      {/* Circular crop */}
       <div className="absolute inset-0 rounded-full overflow-hidden bg-black">
         <video
           ref={videoRef}
@@ -133,23 +121,21 @@ export default function StageSimli({ faceId, agentId, scale = 0.82 }: Props) {
           playsInline
           className="absolute inset-0 w-full h-full object-cover"
           style={{ transform: `scale(${scale})` }}
+          onPlay={() => console.log("[simli] <video> playing")}
+          onLoadedMetadata={() => console.log("[simli] <video> meta", videoRef.current?.videoWidth, videoRef.current?.videoHeight, videoRef.current?.srcObject)}
         />
         <audio ref={audioRef} autoPlay playsInline />
       </div>
-
-      {/* Halo */}
       <div className="absolute inset-0 rounded-full ring-2 ring-white/85 pointer-events-none" />
-
       {!connected && (
         <button
           onClick={onConnect}
           disabled={!ready}
-          className="absolute left-1/2 -translate-x-1/2 bottom-6 rounded-full bg-white text-black px-5 py-2.5 text-sm shadow"
+          className="absolute z-50 left-1/2 -translate-x-1/2 bottom-6 rounded-full bg-white text-black px-5 py-2.5 text-sm shadow"
         >
           {ready ? "Connect" : status}
         </button>
       )}
-      {/* tiny debug line */}
       <div className="absolute top-2 left-1/2 -translate-x-1/2 text-[11px] text-white/70">{status}</div>
     </div>
   );
