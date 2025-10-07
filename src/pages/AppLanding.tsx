@@ -1,5 +1,5 @@
-import { useMemo, useState, useEffect } from "react";
-import StageSimli from "../components/StageSimli";
+import { useMemo, useState } from "react";
+import StageLiveKit from "../components/StageLiveKit";
 import { Dock } from "../components/Dock";
 import { AVATARS } from "../config/avatars";
 import NavBar from "../components/NavBar";
@@ -9,10 +9,6 @@ import GrainOverlay from "../components/GrainOverlay";
 export default function AppLanding() {
   const [activeId, setActiveId] = useState<string | undefined>(AVATARS[0]?.id);
   const active = useMemo(() => AVATARS.find(a => a.id === activeId), [activeId]);
-
-  useEffect(() => {
-    console.log("[ui] activeId =", activeId, "active =", active?.name);
-  }, [activeId, active]);
 
   return (
     <div className="relative min-h-screen">
@@ -30,7 +26,7 @@ export default function AppLanding() {
         {/* Stage area */}
         <section className="mt-10 flex justify-center">
           {active ? (
-            <StageSimli faceId={active.faceId} agentId={active.agentId} scale={active.scale} />
+            <StageLiveKit roomName={active.room} />
           ) : (
             <div
               className="rounded-full"
@@ -50,7 +46,7 @@ export default function AppLanding() {
           <Dock
             avatars={AVATARS}
             activeId={activeId}
-            onSelect={(id) => { console.log("[dock] select", id); setActiveId(id); }}
+            onSelect={setActiveId}
           />
         </section>
       </div>

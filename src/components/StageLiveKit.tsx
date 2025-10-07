@@ -1,48 +1,47 @@
 import { useEffect, useRef, useState } from "react";
-import { Room, RemoteParticipant, createLocalTracks } from "livekit-client";
+import { Room, RoomEvent, RemoteTrackPublication } from "livekit-client";
 
 export default function StageLiveKit({ roomName }: { roomName: string }) {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const audioRef = useRef<HTMLAudioElement>(null);
-  const [status, setStatus] = useState<"Ready"|"Connecting"|"Connected"|"Error">("Ready");
+  const [status, setStatus] = useState("Idle");
   const [room, setRoom] = useState<Room | null>(null);
-  const [connecting, setConnecting] = useState(false);
 
   useEffect(() => () => { room?.disconnect(); }, [room]);
 
   async function connect() {
-    if (connecting) return;
-    setConnecting(true);
     try {
-      setStatus("Connecting");
-      const me = crypto.randomUUID();
-      const apiBase = import.meta.env.VITE_API_BASE || '';
-      const resp = await fetch(`${apiBase}/api/livekit-token?room=avatar-tax&user=${me}`);
-      if (!resp.ok) throw new Error("token http " + resp.status);
-      const { url, token } = await resp.json();
+      setStatus("Fetching token…");
+      const user = crypto.randomUUID();
+      const r = await fetch(`/api/livekit-token?room=${encodeURIComponent(roomName)}&user=${user}`);
+      if (!r.ok) { setStatus("Token 500"); return; }
+      const { url, token } = await r.json();
 
-      const r = new Room();
-      await r.connect(url, token);
+      const lkRoom = new Room({ adaptiveStream: true, dynacast: true });
 
-      // publish your mic to the room (echo-cancelled). Not played locally.
-      const [mic] = await createLocalTracks({
-        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
-      });
-      await r.localParticipant.publishTrack(mic);
-
-      // subscribe to the avatar's remote tracks
-      r.on("trackSubscribed", (track, _pub, participant: RemoteParticipant) => {
-        if (track.kind === "video" && videoRef.current) track.attach(videoRef.current);
-        if (track.kind === "audio" && audioRef.current) track.attach(audioRef.current);
+      // Subscribe to avatar's video track
+      lkRoom.on(RoomEvent.TrackSubscribed, (_track, pub: RemoteTrackPublication, participant) => {
+        console.log("[livekit] track subscribed:", pub.kind, "from", participant.identity);
+        if (pub.kind === "video" && videoRef.current) {
+          pub.videoTrack?.attach(videoRef.current);
+          setStatus(`Watching ${participant.name || participant.identity}`);
+        }
       });
 
-      setRoom(r);
+      setStatus("Joining…");
+      await lkRoom.connect(url, token);
+
+      // Disable camera (visuals come from Simli avatar)
+      await lkRoom.localParticipant.setCameraEnabled(false);
+
+      // Enable microphone (you speak to the agent)
+      await lkRoom.localParticipant.setMicrophoneEnabled(true);
+
+      setRoom(lkRoom);
       setStatus("Connected");
-    } catch (e) {
-      console.error(e);
-      setStatus("Error");
-    } finally {
-      setConnecting(false);
+      console.log("[livekit] connected to room:", roomName);
+    } catch (e: any) {
+      console.error("[livekit] connect error:", e);
+      setStatus("Error: " + (e?.message || String(e)));
     }
   }
 
@@ -50,18 +49,15 @@ export default function StageLiveKit({ roomName }: { roomName: string }) {
     <div className="relative mx-auto" style={{ width: "min(58vmin, 640px)", height: "min(58vmin, 640px)" }}>
       <div className="absolute inset-0 rounded-full overflow-hidden bg-black">
         <video ref={videoRef} autoPlay playsInline className="absolute inset-0 w-full h-full object-cover" />
-        <audio ref={audioRef} autoPlay playsInline />
       </div>
       <div className="absolute inset-0 rounded-full ring-2 ring-white/85 pointer-events-none" />
-      {status !== "Connected" && (
-        <button
-          onClick={connect}
-          disabled={connecting}
-          className="absolute left-1/2 -translate-x-1/2 bottom-6 rounded-full bg-white text-black px-5 py-2.5 text-sm shadow"
-        >
-          {status === "Ready" ? "Connect" : status}
-        </button>
-      )}
+      <button
+        onClick={connect}
+        className="absolute z-50 left-1/2 -translate-x-1/2 bottom-6 rounded-full bg-white text-black px-5 py-2.5 text-sm shadow"
+      >
+        Connect
+      </button>
+      <div className="absolute top-2 left-1/2 -translate-x-1/2 text-[11px] text-white/70">{status}</div>
     </div>
   );
 }
