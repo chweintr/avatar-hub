@@ -18,6 +18,19 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+::selection {
+  background: rgba(255,255,255,.2);
+}
+
+.portal-frame + * {
+  filter: saturate(102%);
+}
+
 /* Dark body with fog overlay */
 body {
   margin: 0;
