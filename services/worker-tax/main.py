@@ -21,10 +21,7 @@ async def entrypoint(ctx: JobContext):
 
     # OpenAI Realtime handles STT + LLM + TTS
     session = AgentSession(
-        llm=openai.realtime.RealtimeModel(
-            voice="alloy",
-            instructions="You are a knowledgeable tax advisor specializing in helping artists, creatives, and freelancers. Provide clear, practical tax advice. Be conversational and friendly. Keep responses concise (2-3 sentences) unless asked for details.",
-        )
+        llm=openai.realtime.RealtimeModel(voice="alloy"),
     )
 
     # Simli avatar configuration

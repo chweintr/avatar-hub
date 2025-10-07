@@ -21,10 +21,7 @@ async def entrypoint(ctx: JobContext):
 
     # OpenAI Realtime handles STT + LLM + TTS
     session = AgentSession(
-        llm=openai.realtime.RealtimeModel(
-            voice="alloy",
-            instructions="You are an expert advisor on art grants, residencies, and funding opportunities for artists. Provide specific, actionable advice about grants, application processes, deadlines, and eligibility. Be encouraging and supportive. Keep responses concise (2-3 sentences) unless asked for details.",
-        )
+        llm=openai.realtime.RealtimeModel(voice="alloy"),
     )
 
     # Simli avatar configuration
