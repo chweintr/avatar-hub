@@ -4,7 +4,7 @@ import httpx
 from dotenv import load_dotenv
 from livekit.agents import Agent, AgentSession, JobContext, WorkerOptions, WorkerType, cli, RunContext
 from livekit.agents.llm import function_tool
-from livekit.plugins import openai, deepgram, silero, simli
+from livekit.plugins import openai, silero, simli
 
 logger = logging.getLogger("grants-advisor-agent")
 logger.setLevel(logging.INFO)
@@ -88,10 +88,11 @@ async def entrypoint(ctx: JobContext):
     rag_url = os.getenv("RAG_BACKEND_URL", "http://localhost:8000")
     knowledge_base = GrantsKnowledgeBase(rag_url)
 
-    # Use Deepgram STT + OpenAI LLM + OpenAI TTS (supports function calling!)
+    # Use OpenAI STT + LLM + TTS (supports function calling!)
+    # Using OpenAI for everything - simpler, one API key
     session = AgentSession(
         vad=silero.VAD.load(),
-        stt=deepgram.STT(model="nova-2"),
+        stt=openai.STT(),  # OpenAI Whisper (no extra API key needed!)
         llm=openai.LLM(model="gpt-4o"),
         tts=openai.TTS(voice="nova"),
     )

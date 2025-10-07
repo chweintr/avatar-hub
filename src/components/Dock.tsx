@@ -37,43 +37,49 @@ function DockChip({
   return (
     <button
       onClick={() => onClick(item.id)}
-      className="dock-btn"
+      className="group relative size-[92px] sm:size-[104px] rounded-full overflow-hidden dock-ring bg-white/6 hover:scale-[1.02] transition"
       aria-label={item.name}
       aria-busy={isBusy ? "true" : "false"}
       data-testid={`dock-avatar-${item.id}`}
+      title={item.name}
     >
-      {item.thumbVideo ? (
+      {/* thumb video > thumbMp4 > image fallback */}
+      {item.thumbMp4 || item.thumbVideo ? (
         <video
           ref={videoRef}
-          src={item.thumbVideo}
+          src={item.thumbMp4 || item.thumbVideo}
           muted
           playsInline
           loop
           autoPlay
           preload="metadata"
-          className={`dock-media ${isBusy ? "dock-media--busy" : ""}`}
+          className="absolute inset-0 size-full object-cover"
         />
       ) : item.thumbnail ? (
         <img
           src={item.thumbnail}
-          alt={item.name}
-          className={`dock-media ${isBusy ? "dock-media--busy" : ""}`}
+          alt=""
+          className="absolute inset-0 size-full object-cover"
         />
       ) : (
-        <div className="dock-media grid place-items-center text-white/60 text-xs">
-          {isActive ? (
-            <svg viewBox="0 0 24 24" className="w-8 h-8" fill="currentColor">
-              <path d="M12 12a5 5 0 100-10 5 5 0 000 10zm0 2c-4.418 0-8 2.239-8 5v1h16v-1c0-2.761-3.582-5-8-5z" />
-            </svg>
-          ) : (
-            item.name.slice(0, 8)
-          )}
+        <div className="absolute inset-0 grid place-items-center text-white/60 text-xs">
+          {item.name.slice(0, 8)}
         </div>
       )}
 
-      <span className={`dock-glow ${isBusy ? "dock-glow--on" : ""}`} />
-      {isBusy && <span className="dock-fog" />}
-      <span className="dock-label" title={item.name}>{item.name}</span>
+      {/* white ring always */}
+      <span className={`pointer-events-none absolute inset-0 rounded-full ring-2 ${isBusy ? "ring-white" : "ring-white/85"}`} />
+
+      {/* fog/"in service" state */}
+      {isBusy && <span className="dock-fog absolute inset-0 rounded-full" />}
+
+      {/* label */}
+      <span className="absolute -bottom-6 left-1/2 -translate-x-1/2 w-28 text-center text-[11px] text-white/85">
+        {item.name}
+      </span>
+
+      {/* pulse when busy */}
+      <span className={`absolute -inset-[2px] rounded-full ${isBusy ? "dock-active" : ""}`} />
     </button>
   );
 }

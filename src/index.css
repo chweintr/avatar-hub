@@ -168,3 +168,74 @@ body {
     box-shadow: 0 20px 80px rgba(0, 0, 0, 0.12);
   }
 }
+
+/* ========== CALEB'S CLUB - BRIGHT FUTURISTIC DESIGN ========== */
+
+:root{
+  --club-teal:  #c8f6ef;
+  --club-pink:  #ffd7ea;
+  --club-gold:  #ffe7b3;
+}
+
+/* Background: bright, foggy tri-tone with soft vignette */
+.bg-club {
+  background:
+    radial-gradient(1200px 800px at 20% 30%, var(--club-teal) 0%, transparent 60%),
+    radial-gradient(1200px 800px at 75% 20%, var(--club-pink) 0%, transparent 60%),
+    radial-gradient(1000px 700px at 60% 85%, var(--club-gold) 0%, transparent 65%),
+    radial-gradient(1400px 900px at 50% 40%, rgba(255,255,255,.5) 0%, transparent 65%),
+    radial-gradient(1000px 700px at 50% 50%, rgba(0,0,0,.85) 55%, rgba(0,0,0,.95) 100%);
+}
+
+/* Parallax target shifts these layers subtly */
+.parallax-wrap { perspective: 1200px; }
+.parallax-move { will-change: transform; transition: transform .25s ease; }
+
+/* Main stage ring + soft outer halo */
+.stage-ring {
+  box-shadow:
+    0 0 0 3px rgba(255,255,255,.95),
+    0 0 35px 0 rgba(255,255,255,.35) inset,
+    0 40px 120px rgba(0,0,0,.45);
+}
+
+/* Idle speckle layer (no images) */
+.stage-speckles::before{
+  content:"";
+  position:absolute; inset:0;
+  pointer-events:none;
+  background:
+    radial-gradient(#fff 0 1px, transparent 1px) 0 0/ 5px 5px,
+    radial-gradient(#fff 0 1px, transparent 1px) 2.5px 2.5px/ 6px 6px;
+  opacity:.18;
+  filter: blur(.2px);
+  animation: speckleDrift 18s linear infinite;
+}
+@keyframes speckleDrift{
+  from { transform: translate3d(0,0,0) rotate(0deg) scale(1); }
+  to   { transform: translate3d(1%,1%,0) rotate(360deg) scale(1.02); }
+}
+
+/* Dock circle rings + glow */
+.dock-ring {
+  box-shadow:
+    0 0 0 2px rgba(255,255,255,.9),
+    0 8px 28px rgba(0,0,0,.25);
+}
+
+/* Fog overlay when avatar is active in stage */
+.dock-fog::after{
+  content:"";
+  position:absolute; inset:0;
+  border-radius:9999px;
+  background: radial-gradient(60% 60% at 50% 40%, rgba(255,255,255,.55), rgba(255,255,255,0) 65%);
+  mix-blend-mode: screen;
+  opacity:.85;
+}
+
+/* Subtle pulse for active avatar ring */
+@keyframes ringPulse {
+  0%,100%{ box-shadow: 0 0 0 2px rgba(255,255,255,.9), 0 8px 28px rgba(0,0,0,.25); }
+  50%    { box-shadow: 0 0 0 4px rgba(255,255,255,1), 0 10px 36px rgba(0,0,0,.3); }
+}
+.dock-active { animation: ringPulse 1.6s ease-in-out infinite; }
