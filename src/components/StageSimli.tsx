@@ -35,7 +35,7 @@ export default function StageSimli({ faceId, agentId, scale = 0.82 }: Props) {
           ...(agentId ? { agentId } : {}),
           videoRef: videoRef.current!,
           audioRef: audioRef.current!,
-          handleSilence: true,
+          handleSilence: false,          // using listenToMediastreamTrack → set false (per docs)
           enableConsoleLogs: true,
         });
 
@@ -78,25 +78,6 @@ export default function StageSimli({ faceId, agentId, scale = 0.82 }: Props) {
     if (!client) { setStatus("Client not ready"); return; }
 
     try {
-      setStatus("Requesting mic…");
-      const mic = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
-      });
-      const track = mic.getAudioTracks()[0];
-      if (!track) throw new Error("No mic track");
-
-      // Never route mic to our speakers
-      if (audioRef.current && (audioRef.current as any).srcObject) {
-        (audioRef.current as any).srcObject = null;
-      }
-
-      // Send mic to Simli (API variants supported)
-      const send =
-        (client.listenToMediastreamTrack && client.listenToMediastreamTrack.bind(client)) ||
-        (client.sendAudioTrack && client.sendAudioTrack.bind(client));
-      if (!send) throw new Error("Simli SDK missing mic method");
-      await send(track);
-
       setStatus("Starting session…");
       const start =
         (client.start && client.start.bind(client)) ||
@@ -104,15 +85,32 @@ export default function StageSimli({ faceId, agentId, scale = 0.82 }: Props) {
         (client.Start && client.Start.bind(client)) ||
         (client.Connect && client.Connect.bind(client));
       if (!start) throw new Error("No start/connect on client");
+      await start(); // per Simli docs: start the WebRTC session first
 
-      console.log("[simli] calling start(), videoRef.srcObject before:", videoRef.current?.srcObject);
-      await start(); // user gesture
-      console.log("[simli] start() completed, videoRef.srcObject after:", videoRef.current?.srcObject);
+      setStatus("Requesting mic…");
+      const mic = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+      });
+      const track = mic.getAudioTracks()[0];
+      if (!track) throw new Error("No mic track");
+
+      // NEVER route mic to speakers
+      if (audioRef.current && (audioRef.current as any).srcObject) {
+        (audioRef.current as any).srcObject = null;
+      }
+
+      // Send mic to Simli after start()
+      const send =
+        (client.listenToMediastreamTrack && client.listenToMediastreamTrack.bind(client)) ||
+        (client.sendAudioTrack && client.sendAudioTrack.bind(client));
+      if (!send) throw new Error("Simli SDK missing mic method");
+      await send(track);
 
       if (audioRef.current) {
         audioRef.current.muted = false;
         try { await audioRef.current.play(); } catch {}
       }
+
       setConnected(true);
       setStatus("Connected");
     } catch (e: any) {
