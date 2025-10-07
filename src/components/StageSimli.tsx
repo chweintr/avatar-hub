@@ -44,10 +44,25 @@ export default function StageSimli({ faceId, agentId, scale = 0.82 }: Props) {
           setStatus("Simli error");
         });
         c.on?.("connected", () => {
+          console.log("[simli] connected event fired");
           setConnected(true);
           setStatus("Connected");
           audioRef.current?.play?.().catch(() => {});
         });
+
+        // Check video metadata
+        if (videoRef.current) {
+          videoRef.current.onloadedmetadata = () => {
+            console.log("[simli] video metadata loaded:", {
+              width: videoRef.current?.videoWidth,
+              height: videoRef.current?.videoHeight,
+              srcObject: videoRef.current?.srcObject
+            });
+          };
+          videoRef.current.onplay = () => {
+            console.log("[simli] video playing");
+          };
+        }
 
         setClient(c);
         setReady(true);
@@ -89,7 +104,10 @@ export default function StageSimli({ faceId, agentId, scale = 0.82 }: Props) {
         (client.Start && client.Start.bind(client)) ||
         (client.Connect && client.Connect.bind(client));
       if (!start) throw new Error("No start/connect on client");
+
+      console.log("[simli] calling start(), videoRef.srcObject before:", videoRef.current?.srcObject);
       await start(); // user gesture
+      console.log("[simli] start() completed, videoRef.srcObject after:", videoRef.current?.srcObject);
 
       if (audioRef.current) {
         audioRef.current.muted = false;
