@@ -2,7 +2,7 @@ import logging
 import os
 from dotenv import load_dotenv
 from livekit.agents import Agent, AgentSession, JobContext, WorkerOptions, WorkerType, cli
-from livekit.plugins import openai, elevenlabs, simli
+from livekit.plugins import openai, simli
 
 logger = logging.getLogger("grants-advisor-agent")
 logger.setLevel(logging.INFO)
@@ -11,7 +11,7 @@ load_dotenv()
 
 
 async def entrypoint(ctx: JobContext):
-    """Grant/Residency Expert Avatar - LiveKit + OpenAI + ElevenLabs + Simli
+    """Grant/Residency Expert Avatar - LiveKit + OpenAI Realtime + Simli
 
     Per official Simli docs: https://docs.livekit.io/agents/plugins/simli/
     The plugin handles avatar participant creation and A/V publishing automatically.
@@ -19,12 +19,11 @@ async def entrypoint(ctx: JobContext):
 
     await ctx.connect()
 
-    # Use ElevenLabs for TTS - API key from ELEVEN_API_KEY env var
+    # OpenAI Realtime handles STT + LLM + TTS with built-in voices
+    # Available voices: alloy, ash, ballad, coral, echo, sage, shimmer, verse
     session = AgentSession(
-        llm=openai.LLM(model="gpt-4o-mini"),
-        tts=elevenlabs.TTS(
-            voice_id=os.getenv("ELEVENLABS_VOICE_ID"),
-            api_key=os.getenv("ELEVEN_API_KEY")  # Explicitly pass the API key
+        llm=openai.realtime.RealtimeModel(
+            voice=os.getenv("OPENAI_VOICE", "ballad")  # Default to 'ballad' (melodic, smooth)
         ),
     )
 
