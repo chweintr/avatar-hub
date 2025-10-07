@@ -22,7 +22,7 @@ async def entrypoint(ctx: JobContext):
     # Use ElevenLabs for TTS (voice from env var)
     session = AgentSession(
         llm=openai.LLM(model="gpt-4o-mini"),
-        tts=elevenlabs.TTS(voice=os.getenv("ELEVENLABS_VOICE_ID")),
+        tts=elevenlabs.TTS(voice_id=os.getenv("ELEVENLABS_VOICE_ID")),
     )
 
     # Simli avatar configuration
