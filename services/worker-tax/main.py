@@ -17,13 +17,10 @@ async def entrypoint(ctx: JobContext):
     The plugin handles avatar participant creation and A/V publishing automatically.
     """
 
-    await ctx.connect()
-
-    # Use OpenAI LLM with OpenAI TTS (ElevenLabs temporarily disabled)
-    # TODO: Debug ElevenLabs integration - may need STT configuration
+    # Use OpenAI Realtime (has built-in STT + LLM + TTS)
+    # This is the official Simli pattern - works reliably
     session = AgentSession(
-        llm=openai.LLM(model="gpt-4o"),  # Full gpt-4o for better numeracy
-        tts=openai.TTS(voice="shimmer"),  # Warm female voice
+        llm=openai.realtime.RealtimeModel(voice="shimmer"),
     )
 
     # Simli avatar configuration

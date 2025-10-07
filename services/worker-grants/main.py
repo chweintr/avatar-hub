@@ -35,46 +35,15 @@ class GrantsKnowledgeBase:
 
 
 async def entrypoint(ctx: JobContext):
-    """Grant/Residency Expert Avatar - RAG-powered with LiveKit + ElevenLabs + Simli
+    """Grant/Residency Expert Avatar - with LiveKit + OpenAI Realtime + Simli
 
-    This agent uses the RAG backend to search a database of art grants and residencies
+    Using simple instructions for now - RAG integration will come later
     """
 
-    await ctx.connect()
-
-    # Initialize RAG backend connection
-    rag_url = os.getenv("RAG_BACKEND_URL", "http://localhost:8000")
-    knowledge_base = GrantsKnowledgeBase(rag_url)
-
-    # Define function tool for grant search
-    @llm.ai_callable()
-    async def search_art_grants(
-        query: str,
-        num_results: int = 5
-    ) -> str:
-        """
-        Search the art grants and residencies knowledge base for relevant opportunities.
-        Use this function whenever the user asks about grants, residencies, funding, or opportunities.
-
-        Args:
-            query: The search query based on user's question
-            num_results: Number of results to return (default 5)
-        """
-        logger.info(f"Searching grants with query: {query}")
-        result = await knowledge_base.search_grants(query, num_results)
-        logger.info(f"Search result: {result[:200]}...")
-        return result
-
-    # Create function context
-    func_ctx = llm.FunctionContext()
-    func_ctx.ai_callable(search_art_grants)
-
-    # Use OpenAI LLM with OpenAI TTS (ElevenLabs temporarily disabled)
-    # TODO: Debug ElevenLabs integration - may need STT configuration
+    # Use OpenAI Realtime (has built-in STT + LLM + TTS)
+    # This is the official Simli pattern - works reliably
     session = AgentSession(
-        llm=openai.LLM(model="gpt-4o"),
-        tts=openai.TTS(voice="nova"),  # Warm, friendly voice
-        functions=[func_ctx],
+        llm=openai.realtime.RealtimeModel(voice="nova"),
     )
 
     # Simli avatar configuration
