@@ -2,54 +2,49 @@ import { useMemo, useState } from "react";
 import StageLiveKit from "../components/StageLiveKit";
 import { Dock } from "../components/Dock";
 import { AVATARS } from "../config/avatars";
-import NavBar from "../components/NavBar";
-import AnimatedBackground from "../components/AnimatedBackground";
-import GrainOverlay from "../components/GrainOverlay";
+import BackgroundFog from "../components/BackgroundFog";
+import Portal from "../components/Portal";
 
 export default function AppLanding() {
   const [activeId, setActiveId] = useState<string | undefined>(AVATARS[0]?.id);
+  const [connected, setConnected] = useState(false);
   const active = useMemo(() => AVATARS.find(a => a.id === activeId), [activeId]);
 
   return (
-    <div className="relative min-h-screen">
-      {/* Layer 0: Animated background */}
-      <AnimatedBackground />
+    <div className="relative min-h-screen flex flex-col items-center justify-center gap-12 p-8">
+      {/* Fog background */}
+      <BackgroundFog />
 
-      {/* Layer 1: Grain overlay */}
-      <GrainOverlay />
+      {/* Title */}
+      <h1 className="relative z-10 text-4xl font-bold text-white/90 tracking-tight">
+        Caleb's Club
+      </h1>
 
-      {/* Nav bar */}
-      <NavBar />
-
-      {/* Main content */}
-      <div className="relative z-[25] mx-auto max-w-6xl px-6 pt-20 pb-16">
-        {/* Stage area */}
-        <section className="mt-10 flex justify-center">
-          {active ? (
-            <StageLiveKit roomName={active.room} />
-          ) : (
-            <div
-              className="rounded-full"
-              style={{
-                width: "min(58vmin, 640px)",
-                height: "min(58vmin, 640px)",
-                border: "2px solid rgba(255,255,255,.85)",
-                background: "radial-gradient(60% 60% at 50% 40%, #111 0%, #000 60%)",
-                boxShadow: "0 40px 120px rgba(0,0,0,0.10) inset",
-              }}
-            />
-          )}
-        </section>
-
-        {/* Dock */}
-        <section id="dock" className="relative mt-16 flex justify-center">
-          <Dock
-            avatars={AVATARS}
-            activeId={activeId}
-            onSelect={setActiveId}
+      {/* Portal stage */}
+      <Portal>
+        {active ? (
+          <StageLiveKit
+            roomName={active.room}
+            bare
+            onConnectionChange={setConnected}
           />
-        </section>
-      </div>
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center text-white/30 text-sm">
+            Select an avatar
+          </div>
+        )}
+      </Portal>
+
+      {/* Dock */}
+      <Dock
+        avatars={AVATARS}
+        activeId={activeId}
+        busyId={connected ? activeId : undefined}
+        onSelect={(id) => {
+          setActiveId(id);
+          setConnected(false);
+        }}
+      />
     </div>
   );
 }

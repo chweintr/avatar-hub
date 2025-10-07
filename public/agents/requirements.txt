@@ -1,0 +1,5 @@
+livekit
+livekit-plugins-openai
+livekit-plugins-simli
+python-dotenv
+logging

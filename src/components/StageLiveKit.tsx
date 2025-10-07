@@ -1,13 +1,24 @@
 import { useEffect, useRef, useState } from "react";
 import { Room, RoomEvent, RemoteTrackPublication, RemoteVideoTrack, RemoteAudioTrack } from "livekit-client";
 
-export default function StageLiveKit({ roomName }: { roomName: string }) {
+export default function StageLiveKit({
+  roomName,
+  bare = false,
+  onConnectionChange
+}: {
+  roomName: string;
+  bare?: boolean;
+  onConnectionChange?: (connected: boolean) => void;
+}) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const [status, setStatus] = useState("Idle");
   const [room, setRoom] = useState<Room | null>(null);
 
-  useEffect(() => () => { room?.disconnect(); }, [room]);
+  useEffect(() => () => {
+    room?.disconnect();
+    onConnectionChange?.(false);
+  }, [room, onConnectionChange]);
 
   async function connect() {
     try {
@@ -69,6 +80,7 @@ export default function StageLiveKit({ roomName }: { roomName: string }) {
 
       setRoom(lkRoom);
       setStatus("Connected");
+      onConnectionChange?.(true);
       console.log("[livekit] connected to room:", roomName);
     } catch (e: any) {
       console.error("[livekit] connect error:", e);
@@ -81,8 +93,34 @@ export default function StageLiveKit({ roomName }: { roomName: string }) {
       room.disconnect();
       setRoom(null);
       setStatus("Disconnected");
+      onConnectionChange?.(false);
       console.log("[livekit] disconnected");
     }
+  }
+
+  if (bare) {
+    return (
+      <>
+        <video ref={videoRef} autoPlay playsInline className="absolute inset-0 w-full h-full object-cover" />
+        <audio ref={audioRef} autoPlay playsInline muted={false} />
+        {!room ? (
+          <button
+            onClick={connect}
+            className="absolute z-50 left-1/2 -translate-x-1/2 bottom-6 rounded-full bg-white text-black px-5 py-2.5 text-sm shadow hover:bg-gray-100"
+          >
+            Connect
+          </button>
+        ) : (
+          <button
+            onClick={disconnect}
+            className="absolute z-50 left-1/2 -translate-x-1/2 bottom-6 rounded-full bg-red-500 text-white px-5 py-2.5 text-sm shadow hover:bg-red-600"
+          >
+            Disconnect
+          </button>
+        )}
+        <div className="absolute top-2 left-1/2 -translate-x-1/2 text-[11px] text-white/70">{status}</div>
+      </>
+    );
   }
 
   return (

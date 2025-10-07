@@ -1,88 +1,92 @@
-import { motion } from "framer-motion";
+import { useEffect, useRef } from "react";
 import { gradientThumb } from "../utils/placeholder";
 import type { DockAvatar } from '../config/avatars';
 
 type DockProps = {
   avatars: DockAvatar[];
   activeId?: string;
+  busyId?: string;
   onSelect: (id: string) => void;
 };
 
 function DockChip({
   item,
   activeId,
+  busyId,
   onClick,
 }: {
   item: DockAvatar;
   activeId?: string;
+  busyId?: string;
   onClick: (id: string) => void;
 }) {
   const isActive = item.id === activeId;
-  const bg = item.thumbnail ? undefined : gradientThumb(item.name);
+  const isBusy = item.id === busyId;
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    const tryPlay = () => v.play().catch(() => {});
+    tryPlay();
+    const onVisibility = () => document.visibilityState === "visible" && tryPlay();
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => document.removeEventListener("visibilitychange", onVisibility);
+  }, []);
 
   return (
     <button
       onClick={() => onClick(item.id)}
-      className="group flex flex-col items-center text-center select-none"
+      className="dock-btn"
       aria-label={item.name}
+      aria-busy={isBusy ? "true" : "false"}
       data-testid={`dock-avatar-${item.id}`}
     >
-      <motion.div
-        initial={{ y: 0, scale: 1 }}
-        whileHover={{
-          y: -8,
-          scale: isActive ? 1 : 1.05,
-        }}
-        transition={{ type: "spring", stiffness: 300, damping: 20 }}
-        className="relative aspect-square w-28 rounded-full overflow-hidden"
-        style={{ background: bg }}
-      >
-        {/* Glassmorphic pill background */}
-        <div className="absolute inset-0 bg-white/[.18] backdrop-blur-xl border border-white/20 rounded-full shadow-[0_8px_32px_rgba(0,0,0,.08)]" />
-
-        {isActive ? (
-          <div className="relative h-full w-full grid place-items-center">
-            <svg
-              viewBox="0 0 24 24"
-              className="w-10 h-10 text-neutral-700"
-              fill="currentColor"
-              aria-hidden
-            >
+      {item.thumbVideo ? (
+        <video
+          ref={videoRef}
+          src={item.thumbVideo}
+          muted
+          playsInline
+          loop
+          autoPlay
+          preload="metadata"
+          className={`dock-media ${isBusy ? "dock-media--busy" : ""}`}
+        />
+      ) : item.thumbnail ? (
+        <img
+          src={item.thumbnail}
+          alt={item.name}
+          className={`dock-media ${isBusy ? "dock-media--busy" : ""}`}
+        />
+      ) : (
+        <div className="dock-media grid place-items-center text-white/60 text-xs">
+          {isActive ? (
+            <svg viewBox="0 0 24 24" className="w-8 h-8" fill="currentColor">
               <path d="M12 12a5 5 0 100-10 5 5 0 000 10zm0 2c-4.418 0-8 2.239-8 5v1h16v-1c0-2.761-3.582-5-8-5z" />
             </svg>
-          </div>
-        ) : item.thumbnail ? (
-          <img
-            src={item.thumbnail}
-            alt={item.name}
-            className="relative h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.08]"
-          />
-        ) : null}
-
-        {/* Enhanced ring glow on hover */}
-        <div className="pointer-events-none absolute inset-0 rounded-full ring-[1.5px] ring-white/40 mix-blend-overlay transition-all duration-300 group-hover:ring-white/60" />
-        <div className="pointer-events-none absolute inset-0 rounded-full shadow-[0_0_0_0_rgba(255,255,255,0)] transition-all duration-300 group-hover:shadow-[0_0_20px_4px_rgba(255,255,255,0.3)]" />
-
-        {/* Label ON the circle - centered with dark text */}
-        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-          <div className="text-balance line-clamp-2 px-2 text-[clamp(11px,1.5vw,12px)] font-semibold text-neutral-800 drop-shadow-sm">
-            {item.name}
-          </div>
+          ) : (
+            item.name.slice(0, 8)
+          )}
         </div>
-      </motion.div>
+      )}
+
+      <span className={`dock-glow ${isBusy ? "dock-glow--on" : ""}`} />
+      {isBusy && <span className="dock-fog" />}
+      <span className="dock-label" title={item.name}>{item.name}</span>
     </button>
   );
 }
 
-export function Dock({ avatars, activeId, onSelect }: DockProps) {
+export function Dock({ avatars, activeId, busyId, onSelect }: DockProps) {
   return (
     <ul
-      className="flex flex-wrap items-center justify-center gap-7"
+      className="flex items-center justify-center gap-4"
       data-testid="dock"
     >
       {avatars.map((a) => (
         <li key={a.id}>
-          <DockChip item={a} activeId={activeId} onClick={onSelect} />
+          <DockChip item={a} activeId={activeId} busyId={busyId} onClick={onSelect} />
         </li>
       ))}
     </ul>
