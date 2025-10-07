@@ -2,7 +2,7 @@ import logging
 import os
 from dotenv import load_dotenv
 from livekit.agents import Agent, AgentSession, JobContext, WorkerOptions, WorkerType, cli
-from livekit.plugins import openai, simli
+from livekit.plugins import openai, elevenlabs, simli
 
 logger = logging.getLogger("tax-advisor-agent")
 logger.setLevel(logging.INFO)
@@ -19,9 +19,14 @@ async def entrypoint(ctx: JobContext):
 
     await ctx.connect()
 
-    # OpenAI Realtime handles STT + LLM + TTS - using female voice
+    # Use OpenAI LLM with ElevenLabs TTS for custom voice
     session = AgentSession(
-        llm=openai.realtime.RealtimeModel(voice="shimmer"),  # Female voice instead of alloy
+        llm=openai.LLM(model="gpt-4o"),  # Full gpt-4o for better numeracy
+        tts=elevenlabs.TTS(
+            voice_id=os.getenv("ELEVENLABS_VOICE_ID", "NaKPQmdr7mMxXuXrNeFC"),
+            api_key=os.getenv("ELEVEN_API_KEY"),
+            model="eleven_turbo_v2_5"
+        ),
     )
 
     # Simli avatar configuration
