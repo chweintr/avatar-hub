@@ -76,6 +76,15 @@ export default function StageLiveKit({ roomName }: { roomName: string }) {
     }
   }
 
+  function disconnect() {
+    if (room) {
+      room.disconnect();
+      setRoom(null);
+      setStatus("Disconnected");
+      console.log("[livekit] disconnected");
+    }
+  }
+
   return (
     <div className="relative mx-auto" style={{ width: "min(58vmin, 640px)", height: "min(58vmin, 640px)" }}>
       <div className="absolute inset-0 rounded-full overflow-hidden bg-black">
@@ -83,12 +92,21 @@ export default function StageLiveKit({ roomName }: { roomName: string }) {
         <audio ref={audioRef} autoPlay playsInline muted={false} />
       </div>
       <div className="absolute inset-0 rounded-full ring-2 ring-white/85 pointer-events-none" />
-      <button
-        onClick={connect}
-        className="absolute z-50 left-1/2 -translate-x-1/2 bottom-6 rounded-full bg-white text-black px-5 py-2.5 text-sm shadow"
-      >
-        Connect
-      </button>
+      {!room ? (
+        <button
+          onClick={connect}
+          className="absolute z-50 left-1/2 -translate-x-1/2 bottom-6 rounded-full bg-white text-black px-5 py-2.5 text-sm shadow hover:bg-gray-100"
+        >
+          Connect
+        </button>
+      ) : (
+        <button
+          onClick={disconnect}
+          className="absolute z-50 left-1/2 -translate-x-1/2 bottom-6 rounded-full bg-red-500 text-white px-5 py-2.5 text-sm shadow hover:bg-red-600"
+        >
+          Disconnect
+        </button>
+      )}
       <div className="absolute top-2 left-1/2 -translate-x-1/2 text-[11px] text-white/70">{status}</div>
     </div>
   );
