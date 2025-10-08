@@ -22,15 +22,23 @@ class GrantsKnowledgeBase:
     async def search_grants(self, query: str, num_results: int = 5) -> str:
         """Search the RAG backend for relevant grants/residencies"""
         try:
+            logger.info(f"Attempting to connect to RAG backend at: {self.rag_backend_url}")
             response = await self.client.post(
                 f"{self.rag_backend_url}/query",
                 json={"query": query, "num_results": num_results, "stream": False}
             )
             response.raise_for_status()
             data = response.json()
+            logger.info(f"Successfully retrieved response from RAG backend")
             return data.get("response", "I couldn't find specific information about that.")
+        except httpx.ConnectError as e:
+            logger.error(f"RAG backend connection error - cannot reach {self.rag_backend_url}: {e}")
+            return "I'm currently unable to access my knowledge base. The backend service may not be running or the URL may be misconfigured. Please contact support."
+        except httpx.TimeoutException as e:
+            logger.error(f"RAG backend timeout: {e}")
+            return "The knowledge base is taking too long to respond. Please try again in a moment."
         except Exception as e:
-            logger.error(f"RAG backend error: {e}")
+            logger.error(f"RAG backend error: {type(e).__name__} - {e}")
             return "I'm having trouble accessing my knowledge base right now. Please try again."
 
 
@@ -85,8 +93,14 @@ async def entrypoint(ctx: JobContext):
     global knowledge_base
 
     # Initialize RAG backend connection
-    rag_url = os.getenv("RAG_BACKEND_URL", "http://localhost:8000")
-    knowledge_base = GrantsKnowledgeBase(rag_url)
+    rag_url = os.getenv("RAG_BACKEND_URL")
+    if not rag_url:
+        logger.error("RAG_BACKEND_URL environment variable not set! Agent will not be able to search grants.")
+        logger.error("Set RAG_BACKEND_URL to your Railway RAG backend internal URL (e.g., http://rag-backend.railway.internal:8000)")
+    else:
+        logger.info(f"Connecting to RAG backend at: {rag_url}")
+
+    knowledge_base = GrantsKnowledgeBase(rag_url or "http://localhost:8000")
 
     # Use OpenAI STT + LLM + TTS (supports function calling!)
     # Using OpenAI for everything - simpler, one API key
