@@ -20,7 +20,7 @@ async def entrypoint(ctx: JobContext):
     # Use OpenAI Realtime (has built-in STT + LLM + TTS)
     # This is the official Simli pattern - works reliably
     session = AgentSession(
-        llm=openai.realtime.RealtimeModel(voice="shimmer"),
+        llm=openai.realtime.RealtimeModel(voice="archana"),
     )
 
     # Simli avatar configuration - use TAX specific face ID
