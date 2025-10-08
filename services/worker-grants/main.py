@@ -29,17 +29,18 @@ class GrantsKnowledgeBase:
             )
             response.raise_for_status()
             data = response.json()
-            logger.info(f"Successfully retrieved response from RAG backend")
+            logger.info(f"✓ Successfully retrieved response from RAG backend")
             return data.get("response", "I couldn't find specific information about that.")
         except httpx.ConnectError as e:
-            logger.error(f"RAG backend connection error - cannot reach {self.rag_backend_url}: {e}")
-            return "I'm currently unable to access my knowledge base. The backend service may not be running or the URL may be misconfigured. Please contact support."
+            logger.error(f"❌ RAG backend connection error - cannot reach {self.rag_backend_url}: {e}")
+            logger.error(f"⚠️  Make sure RAG_BACKEND_URL is set and the rag-backend service is deployed on Railway")
+            return "I apologize, but I'm currently unable to access my grants database. The connection to my knowledge base isn't working. This usually means the database service isn't running or the connection URL needs to be configured."
         except httpx.TimeoutException as e:
-            logger.error(f"RAG backend timeout: {e}")
+            logger.error(f"⏱️  RAG backend timeout: {e}")
             return "The knowledge base is taking too long to respond. Please try again in a moment."
         except Exception as e:
-            logger.error(f"RAG backend error: {type(e).__name__} - {e}")
-            return "I'm having trouble accessing my knowledge base right now. Please try again."
+            logger.error(f"❌ RAG backend error: {type(e).__name__} - {e}")
+            return "I'm having trouble accessing my knowledge base right now. Please try again or contact support."
 
 
 # Global knowledge base instance
@@ -92,15 +93,34 @@ async def entrypoint(ctx: JobContext):
 
     global knowledge_base
 
-    # Initialize RAG backend connection
+    # Validate required environment variables
+    simli_api_key = os.getenv("SIMLI_API_KEY")
+    simli_face_id = os.getenv("SIMLI_GRANTS_FACE_ID") or os.getenv("SIMLI_FACE_ID")
     rag_url = os.getenv("RAG_BACKEND_URL")
-    if not rag_url:
-        logger.error("RAG_BACKEND_URL environment variable not set! Agent will not be able to search grants.")
-        logger.error("Set RAG_BACKEND_URL to your Railway RAG backend internal URL (e.g., http://rag-backend.railway.internal:8000)")
-    else:
-        logger.info(f"Connecting to RAG backend at: {rag_url}")
 
-    knowledge_base = GrantsKnowledgeBase(rag_url or "http://localhost:8000")
+    if not simli_api_key:
+        logger.error("SIMLI_API_KEY environment variable is not set!")
+        raise ValueError("SIMLI_API_KEY is required")
+
+    if not simli_face_id:
+        logger.error("SIMLI_GRANTS_FACE_ID or SIMLI_FACE_ID environment variable is not set!")
+        raise ValueError("SIMLI_FACE_ID is required")
+
+    # Initialize RAG backend connection
+    if not rag_url:
+        logger.error("⚠️  RAG_BACKEND_URL environment variable not set!")
+        logger.error("⚠️  Agent will not be able to access the grants database!")
+        logger.error("Set RAG_BACKEND_URL to your Railway RAG backend internal URL")
+        logger.error("Example: RAG_BACKEND_URL=http://rag-backend.railway.internal:8000")
+        # Still continue but database won't work
+        rag_url = "http://localhost:8000"
+    else:
+        logger.info(f"✓ Connecting to RAG backend at: {rag_url}")
+
+    knowledge_base = GrantsKnowledgeBase(rag_url)
+
+    logger.info(f"Starting grants advisor agent in room: {ctx.room.name}")
+    logger.info(f"Using Simli face ID: {simli_face_id}")
 
     # Use OpenAI STT + LLM + TTS (supports function calling!)
     # Using OpenAI for everything - simpler, one API key
@@ -114,14 +134,14 @@ async def entrypoint(ctx: JobContext):
     # Simli avatar configuration - use GRANTS specific face ID
     avatar = simli.AvatarSession(
         simli_config=simli.SimliConfig(
-            api_key=os.getenv("SIMLI_API_KEY"),
-            face_id=os.getenv("SIMLI_GRANTS_FACE_ID") or os.getenv("SIMLI_FACE_ID"),  # Fallback to generic
+            api_key=simli_api_key,
+            face_id=simli_face_id,
         ),
     )
 
     # Start avatar
     await avatar.start(session, room=ctx.room)
-    logger.info("Simli avatar started")
+    logger.info("✓ Simli avatar started successfully")
 
     # Start the agent session with GrantsAgent (has function tools)
     await session.start(

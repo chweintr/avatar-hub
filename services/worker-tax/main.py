@@ -17,6 +17,21 @@ async def entrypoint(ctx: JobContext):
     The plugin handles avatar participant creation and A/V publishing automatically.
     """
 
+    # Validate required environment variables
+    simli_api_key = os.getenv("SIMLI_API_KEY")
+    simli_face_id = os.getenv("SIMLI_TAX_FACE_ID") or os.getenv("SIMLI_FACE_ID")
+
+    if not simli_api_key:
+        logger.error("SIMLI_API_KEY environment variable is not set!")
+        raise ValueError("SIMLI_API_KEY is required")
+
+    if not simli_face_id:
+        logger.error("SIMLI_TAX_FACE_ID or SIMLI_FACE_ID environment variable is not set!")
+        raise ValueError("SIMLI_FACE_ID is required")
+
+    logger.info(f"Starting tax advisor agent in room: {ctx.room.name}")
+    logger.info(f"Using Simli face ID: {simli_face_id}")
+
     # Use OpenAI Realtime (has built-in STT + LLM + TTS)
     # This is the official Simli pattern - works reliably
     session = AgentSession(
@@ -26,14 +41,14 @@ async def entrypoint(ctx: JobContext):
     # Simli avatar configuration - use TAX specific face ID
     avatar = simli.AvatarSession(
         simli_config=simli.SimliConfig(
-            api_key=os.getenv("SIMLI_API_KEY"),
-            face_id=os.getenv("SIMLI_TAX_FACE_ID") or os.getenv("SIMLI_FACE_ID"),  # Fallback to generic
+            api_key=simli_api_key,
+            face_id=simli_face_id,
         ),
     )
 
     # Start avatar - plugin handles LiveKit credentials internally via ctx.room
     await avatar.start(session, room=ctx.room)
-    logger.info("Simli avatar started")
+    logger.info("Simli avatar started successfully")
 
     # Full tax advisor system prompt
     instructions = """Identity and stance
