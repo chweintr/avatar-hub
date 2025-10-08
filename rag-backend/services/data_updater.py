@@ -15,8 +15,8 @@ from bs4 import BeautifulSoup
 import feedparser
 from pydantic import BaseModel, Field
 
-from ..utils.config import settings
-from .vector_store import VectorStoreService
+from utils.config import settings
+from services.vector_store import VectorStoreService
 
 # Configure logging
 logger = logging.getLogger(__name__)

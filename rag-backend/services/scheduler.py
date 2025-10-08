@@ -11,8 +11,8 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
-from ..utils.config import settings
-from .data_updater import DataUpdaterService
+from utils.config import settings
+from services.data_updater import DataUpdaterService
 
 logger = logging.getLogger(__name__)
 
