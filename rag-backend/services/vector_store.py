@@ -112,7 +112,12 @@ class VectorStoreService:
             errors = []
             
             # Handle different JSON structures
-            entries = data if isinstance(data, list) else data.get('entries', [])
+            if isinstance(data, list):
+                entries = data
+            elif 'knowledge_base' in data:
+                entries = data['knowledge_base'].get('entries', [])
+            else:
+                entries = data.get('entries', [])
             
             for entry_data in entries:
                 try:
