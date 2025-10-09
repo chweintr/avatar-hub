@@ -1,0 +1,124 @@
+{
+  "knowledge_base": {
+    "metadata": {
+      "version": "1.0",
+      "last_updated": "2024-01-15",
+      "description": "Art grants and residencies expert knowledge base"
+    },
+    "entries": [
+      {
+        "id": "res_001",
+        "type": "residency",
+        "name": "MacDowell Colony",
+        "location": "New Hampshire, USA",
+        "description": "One of the nation's leading contemporary arts organizations, MacDowell nurtures the arts by offering creative individuals of the highest talent an inspiring environment in which to produce enduring works of the imagination.",
+        "disciplines": ["Visual Arts", "Literature", "Music", "Film", "Architecture", "Theatre"],
+        "duration": "2-8 weeks",
+        "benefits": ["Private studio", "Accommodations", "Meals provided", "No fees"],
+        "application_tips": "Focus on the quality of your work samples and clarity of your project proposal. MacDowell values artists at all career stages.",
+        "deadlines": ["January 15", "April 15", "September 15"],
+        "website": "https://www.macdowell.org"
+      },
+      {
+        "id": "grant_001",
+        "type": "grant",
+        "name": "National Endowment for the Arts Fellowship",
+        "funder": "National Endowment for the Arts",
+        "amount": "$25,000",
+        "description": "NEA Literature Fellowships in creative writing enable recipients to set aside time for writing, research, travel, and general career advancement.",
+        "disciplines": ["Literature", "Poetry", "Creative Nonfiction"],
+        "eligibility": "US citizens or permanent residents with published work",
+        "application_tips": "Submit your strongest, most polished work. The manuscript is the most important part of your application.",
+        "deadline": "March 1",
+        "website": "https://www.arts.gov"
+      },
+      {
+        "id": "res_002",
+        "type": "residency",
+        "name": "Cité Internationale des Arts",
+        "location": "Paris, France",
+        "description": "Located in the heart of Paris, the Cité Internationale des Arts is a residence that allows artists to work in an environment that is favorable for creativity.",
+        "disciplines": ["Visual Arts", "Music", "Writing", "Performance", "Curatorial Practice"],
+        "duration": "2-12 months",
+        "benefits": ["Studio apartment in Paris", "Access to professional networks"],
+        "costs": "€600-1000/month rent",
+        "application_tips": "Demonstrate how a Paris residency specifically relates to your artistic research. French language skills helpful but not required.",
+        "deadlines": ["February 15", "September 15"],
+        "website": "https://www.citedesartsparis.fr"
+      },
+      {
+        "id": "grant_002",
+        "type": "grant",
+        "name": "Pollock-Krasner Foundation Grant",
+        "funder": "Pollock-Krasner Foundation",
+        "amount": "Varies ($5,000-$30,000)",
+        "description": "The foundation's dual criteria for grants are recognizable artistic merit and demonstrable financial need.",
+        "disciplines": ["Visual Arts"],
+        "eligibility": "Professional artists worldwide",
+        "application_tips": "Be honest about your financial situation. Include strong images of recent work and a clear artist statement.",
+        "deadline": "Rolling basis",
+        "website": "https://pkf.org"
+      },
+      {
+        "id": "res_003",
+        "type": "residency",
+        "name": "Künstlerhaus Bethanien",
+        "location": "Berlin, Germany",
+        "description": "International cultural center dedicated to supporting contemporary art with studio residencies in Berlin.",
+        "disciplines": ["Visual Arts", "New Media", "Performance Art"],
+        "duration": "11 months",
+        "benefits": ["Studio space", "Monthly stipend €1,350", "Production budget €2,000"],
+        "application_tips": "Proposal should show awareness of Berlin's art scene. Include plans for public presentation of work.",
+        "deadline": "January 31",
+        "website": "https://www.kuenstlerhausbethanien.de"
+      },
+      {
+        "id": "tip_001",
+        "type": "application_tip",
+        "category": "work_samples",
+        "title": "Selecting Strong Work Samples",
+        "content": "Choose recent work (within last 3 years) that best represents your current artistic practice. Quality over quantity - 10 excellent images are better than 20 mediocre ones. Ensure technical quality: good lighting, proper resolution (300 dpi for images), clear audio for sound work."
+      },
+      {
+        "id": "tip_002",
+        "type": "application_tip",
+        "category": "artist_statement",
+        "title": "Writing an Effective Artist Statement",
+        "content": "Keep it concise (250-500 words). Write in first person, active voice. Explain what you make, why you make it, and how you make it. Avoid jargon and overly theoretical language. Connect your work to larger themes or questions."
+      },
+      {
+        "id": "tip_003",
+        "type": "application_tip",
+        "category": "project_proposal",
+        "title": "Crafting a Compelling Project Proposal",
+        "content": "Be specific about what you'll create during the residency/grant period. Include a realistic timeline. Explain why this opportunity is crucial now. Show you've researched the institution/funder. Include how you'll share or present the work."
+      },
+      {
+        "id": "res_004",
+        "type": "residency",
+        "name": "Headlands Center for the Arts",
+        "location": "California, USA",
+        "description": "Located in the Marin Headlands, offers residencies in a spectacular natural setting overlooking the Pacific Ocean and San Francisco.",
+        "disciplines": ["Visual Arts", "Performing Arts", "Literature", "Music"],
+        "duration": "4-10 weeks",
+        "benefits": ["Live/work studio", "Stipend", "Meals", "Materials budget"],
+        "application_tips": "Emphasize site-responsive work or how the unique environment will impact your practice.",
+        "deadline": "June 1",
+        "website": "https://www.headlands.org"
+      },
+      {
+        "id": "grant_003",
+        "type": "grant",
+        "name": "Creative Capital Award",
+        "funder": "Creative Capital",
+        "amount": "Up to $50,000 plus professional development",
+        "description": "Supports innovative and adventurous artists across disciplines pursuing groundbreaking projects.",
+        "disciplines": ["Visual Arts", "Performing Arts", "Literature", "Film", "Digital Arts"],
+        "eligibility": "US-based artists",
+        "application_tips": "Project must be in early stages. Show innovation and potential impact. Budget must be detailed and realistic.",
+        "deadline": "Usually February/March",
+        "website": "https://creative-capital.org"
+      }
+    ]
+  }
+}
