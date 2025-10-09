@@ -37,7 +37,7 @@ class Settings(BaseSettings):
     # Application Configuration
     APP_NAME: str = Field("Art Grants & Residency Expert", description="Application name")
     DEBUG: bool = Field(False, description="Debug mode")
-    CORS_ORIGINS: List[str] = Field(["*"], description="CORS allowed origins")
+    CORS_ORIGINS: Optional[str] = Field("*", description="CORS allowed origins (comma-separated)")
     PORT: int = Field(8000, description="Application port")
     
     # Railway Configuration
@@ -82,6 +82,7 @@ If the context doesn't contain specific information, acknowledge this honestly a
         env_file = ".env"
         env_file_encoding = "utf-8"
         case_sensitive = True
+        extra = "ignore"
 
 # Create settings instance
 settings = Settings()
