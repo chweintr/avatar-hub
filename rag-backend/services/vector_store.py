@@ -99,25 +99,30 @@ class VectorStoreService:
             force_update: Whether to update existing entries
         """
         logger.info(f"Starting ingestion from {file_path}")
-        
+
         try:
             # Load JSON data
             with open(file_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
-            
+
+            logger.info(f"Loaded JSON with keys: {data.keys() if isinstance(data, dict) else 'list'}")
+
             # Process entries
             entries_processed = 0
             entries_added = 0
             entries_updated = 0
             errors = []
-            
+
             # Handle different JSON structures
             if isinstance(data, list):
                 entries = data
+                logger.info(f"Found {len(entries)} entries in list format")
             elif 'knowledge_base' in data:
                 entries = data['knowledge_base'].get('entries', [])
+                logger.info(f"Found {len(entries)} entries in knowledge_base.entries format")
             else:
                 entries = data.get('entries', [])
+                logger.info(f"Found {len(entries)} entries in entries format")
             
             for entry_data in entries:
                 try:
