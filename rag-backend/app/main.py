@@ -54,10 +54,19 @@ async def lifespan(app: FastAPI):
         retrieval_service = RetrievalService(vector_store_service)
         llm_service = LLMService()
         simli_orchestrator = SimliOrchestrator(retrieval_service, llm_service)
-        
+
+        # Auto-ingest data on first startup if database is empty
+        if vector_store_service.collection.count() == 0:
+            logger.info("Database is empty - auto-ingesting knowledge base...")
+            try:
+                await vector_store_service.ingest_json_data("./data/art_grants_residencies_kb.json", force_update=True)
+                logger.info("✓ Auto-ingestion completed successfully")
+            except Exception as ingest_error:
+                logger.error(f"Auto-ingestion failed: {ingest_error}")
+
         # Start the update scheduler
         scheduler.start()
-        
+
         logger.info("All services initialized successfully")
     except Exception as e:
         logger.error(f"Failed to initialize services: {e}")
